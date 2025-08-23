@@ -1,68 +1,172 @@
+@import "tailwindcss";
+
+/* Enhanced Architecture Visualizer Styles */
+@keyframes smoothPulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes dragGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 8px rgba(255, 23, 68, 0.3));
+  }
+  50% {
+    filter: drop-shadow(0 0 16px rgba(255, 23, 68, 0.6));
+  }
+}
+
+.architecture-component {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: grab;
+}
+
+.architecture-component:hover {
+  filter: brightness(1.1) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
+}
+
+.architecture-component.dragging {
+  cursor: grabbing;
+  animation: dragGlow 1s ease-in-out infinite;
+  z-index: 1000;
+}
+
+.architecture-connection {
+  transition: all 0.3s ease;
+}
+
+.architecture-connection:hover {
+  stroke-width: 4px !important;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+.architecture-layer {
+  transition: all 0.3s ease;
+}
+
+.architecture-grid {
+  opacity: 0.3;
+  transition: opacity 0.3s ease;
+}
+
+.architecture-grid:hover {
+  opacity: 0.5;
+}
+
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --background: 0 0% 100%;
+  --foreground: 240 10% 3.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 10% 3.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 10% 3.9%;
+  --primary: 240 5.9% 10%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 240 4.8% 95.9%;
+  --secondary-foreground: 240 5.9% 10%;
+  --muted: 240 4.8% 95.9%;
+  --muted-foreground: 240 3.8% 46.1%;
+  --accent: 240 4.8% 95.9%;
+  --accent-foreground: 240 5.9% 10%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 240 5.9% 90%;
+  --input: 240 5.9% 90%;
+  --ring: 240 10% 3.9%;
+  --radius: 0.5rem;
+  
+  /* Semantic colors for consistent theming */
+  --success: 142 76% 36%;
+  --success-foreground: 0 0% 98%;
+  --success-muted: 142 76% 94%;
+  --success-muted-foreground: 142 76% 16%;
+  
+  --warning: 38 92% 50%;
+  --warning-foreground: 0 0% 98%;
+  --warning-muted: 38 92% 95%;
+  --warning-muted-foreground: 38 92% 30%;
+  
+  --info: 221 83% 53%;
+  --info-foreground: 0 0% 98%;
+  --info-muted: 221 83% 95%;
+  --info-muted-foreground: 221 83% 33%;
+  
+  --error: 0 84% 60%;
+  --error-foreground: 0 0% 98%;
+  --error-muted: 0 84% 95%;
+  --error-muted-foreground: 0 84% 40%;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+.dark {
+  --background: 240 10% 3.9%;
+  --foreground: 0 0% 98%;
+  --card: 240 10% 3.9%;
+  --card-foreground: 0 0% 98%;
+  --popover: 240 10% 3.9%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 0 0% 98%;
+  --primary-foreground: 240 5.9% 10%;
+  --secondary: 240 3.7% 15.9%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 240 3.7% 15.9%;
+  --muted-foreground: 240 5% 64.9%;
+  --accent: 240 3.7% 15.9%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 240 3.7% 15.9%;
+  --input: 240 3.7% 15.9%;
+  --ring: 240 4.9% 83.9%;
+  
+  /* Dark mode semantic colors */
+  --success: 142 76% 46%;
+  --success-foreground: 0 0% 98%;
+  --success-muted: 142 76% 15%;
+  --success-muted-foreground: 142 76% 76%;
+  
+  --warning: 38 92% 60%;
+  --warning-foreground: 0 0% 98%;
+  --warning-muted: 38 92% 15%;
+  --warning-muted-foreground: 38 92% 70%;
+  
+  --info: 221 83% 63%;
+  --info-foreground: 0 0% 98%;
+  --info-muted: 221 83% 15%;
+  --info-muted-foreground: 221 83% 73%;
+  
+  --error: 0 84% 70%;
+  --error-foreground: 0 0% 98%;
+  --error-muted: 0 84% 15%;
+  --error-muted-foreground: 0 84% 80%;
 }
-a:hover {
-  color: #535bf2;
+
+* {
+  border-color: hsl(var(--border));
 }
 
 body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-feature-settings: "rlig" 1, "calt" 1;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+.react-flow__node {
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  border: 2px solid hsl(var(--border));
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+.react-flow__edge {
+  stroke: hsl(var(--muted-foreground));
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+.syntax-highlight {
+  background-color: hsl(var(--muted) / 0.5);
+  border-radius: 0.375rem;
+  padding: 1rem;
+  border: 1px solid hsl(var(--border));
 }
