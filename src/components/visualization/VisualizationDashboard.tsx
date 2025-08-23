@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { FileNode, GitHubRepo } from '@/types'
 import { InteractiveFileTree } from './InteractiveFileTree'
 import { FileNetwork } from './FileNetwork'
-import { ArchitectureVisualizer } from './ArchitectureVisualizer'
+import { ArchitectureVisualizerV2 } from './ArchitectureVisualizerV2'
 import { enhancedAnalyzer, SystemArchitecture } from '@/lib/enhanced-analyzer'
 import { 
   TreePine, 
@@ -257,7 +257,7 @@ export function VisualizationDashboard({
                       <span>Fast architecture view loading full details…</span>
                     </div>
                   )}
-                  <ArchitectureVisualizer architecture={architecture} />
+                  <ArchitectureVisualizerV2 architecture={architecture} />
                 </div>
               ) : (
                 <div className="flex items-center justify-center py-12">

@@ -1,0 +1,29 @@
+/* InteractiveFileTree.css
+   Minimal placeholder to resolve Vite import error. Add styles as needed for tree view visuals. */
+
+.architecture-tree-view {
+   /* ensure content stands out on dark bg */
+   backdrop-filter: saturate(120%) blur(0px);
+}
+
+.layer-box {
+   transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.tree-node {
+   transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.tree-node-group { margin-bottom: 1.25rem; position: relative; }
+.tree-children { gap: 2rem; }
+.connector-line { height: 2px; }
+.relationship-label { font-weight: 500; }
+.layer-label { letter-spacing: 0.03em; }
+
+/* Connectors */
+.connector-spacer { display: flex; justify-content: center; height: 16px; position: relative; }
+.v-line { width: 2px; height: 100%; background: #334155; opacity: 0.8; }
+.tree-children { position: relative; }
+.h-line { position: absolute; top: 0; left: 0; right: 0; height: 2px; background: #334155; opacity: 0.6; }
+.child-connector { position: relative; padding-top: 8px; }
+.child-connector .v-stub { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 2px; height: 8px; background: #334155; opacity: 0.8; }
