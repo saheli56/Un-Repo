@@ -6,6 +6,10 @@
 
 import { GitHubAPI, GitHubFile } from './github-api'
 
+// Simple in-memory caches
+const analysisResultCache = new Map<string, SystemArchitecture>()
+const analysisPromiseCache = new Map<string, Promise<SystemArchitecture>>()
+
 export interface APICall {
   url: string
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
@@ -39,6 +43,8 @@ export interface SystemArchitecture {
   buildTools: BuildTool[]
   staticAssets: string[]
   entryPoints: string[]
+  // Performance/meta flag to know if this is a quick (fast) build
+  isFast?: boolean
 }
 
 export interface ArchitectureComponent {
@@ -73,43 +79,79 @@ export class EnhancedAnalyzer {
   /**
    * Main analysis method - generates comprehensive system architecture
    */
-  async analyzeRepository(owner: string, repoName: string): Promise<SystemArchitecture> {
+  async analyzeRepository(owner: string, repoName: string, options?: { useCache?: boolean; fast?: boolean }): Promise<SystemArchitecture> {
     console.log(`🔍 Starting enhanced analysis for ${owner}/${repoName}`)
-    
-    // 1. Fetch repository information
-    const repoResponse = await GitHubAPI.getRepository(owner, repoName)
-    if (repoResponse.error || !repoResponse.data) {
-      throw new Error(`Failed to fetch repository: ${repoResponse.error}`)
+    const useCache = options?.useCache !== false
+    const fast = !!options?.fast
+    const cacheKey = `${owner}/${repoName}|${fast ? 'fast' : 'full'}`
+
+    if (useCache) {
+      const cached = analysisResultCache.get(cacheKey)
+      if (cached) {
+        console.log(`⚡ Returning cached ${fast ? 'fast' : 'full'} architecture`)
+        return cached
+      }
+      const inflight = analysisPromiseCache.get(cacheKey)
+      if (inflight) {
+        console.log(`⏳ Awaiting in-flight ${fast ? 'fast' : 'full'} analysis`)
+        return inflight
+      }
     }
-    // Repository info stored for reference
 
-    // 2. Get file structure and contents
-    const files = await this.fetchRepositoryFiles(owner, repoName)
-    console.log(`📁 Fetched ${files.length} files`)
+    const analysisPromise = (async () => {
+      // 1. Fetch repository information
+      const repoResponse = await GitHubAPI.getRepository(owner, repoName)
+      if (repoResponse.error || !repoResponse.data) {
+        throw new Error(`Failed to fetch repository: ${repoResponse.error}`)
+      }
 
-    // 3. Parse package.json and dependencies
-    await this.parsePackageJson(owner, repoName)
+      // 2. Get file structure and contents (fast mode limits deeper downloads)
+      const files = await this.fetchRepositoryFiles(owner, repoName, { fast })
+      console.log(`📁 Fetched ${files.length} files (${fast ? 'fast' : 'full'} mode)`)        
 
-    // 4. Analyze file contents for API calls and patterns
-    const apiCalls = await this.extractAPIcalls(files)
-    console.log(`🌐 Found ${apiCalls.length} API calls`)
+      // 3. Parse package.json and dependencies (needed for build tool detection)
+      await this.parsePackageJson(owner, repoName)
 
-    // 5. Identify build tools and configuration
-    const buildTools = this.identifyBuildTools(files)
-    console.log(`🔧 Identified ${buildTools.length} build tools`)
+      // 4. Analyze file contents for API calls and patterns (skip for fast mode)
+      const apiCalls = fast ? [] : await this.extractAPIcalls(files)
+      if (!fast) {
+        console.log(`🌐 Found ${apiCalls.length} API calls`)
+      } else {
+        console.log('⏭️ Skipping API call extraction in fast mode')
+      }
 
-    // 6. Create architecture layers and components
-    const architecture = this.createSystemArchitecture(files, apiCalls, buildTools)
-    console.log(`🏗️ Created architecture with ${architecture.layers.length} layers`)
+      // 5. Identify build tools and configuration (cheap enough to keep)
+      const buildTools = this.identifyBuildTools(files)
+      console.log(`🔧 Identified ${buildTools.length} build tools`)
 
-    return architecture
+      // 6. Create architecture layers and components
+      const architecture = this.createSystemArchitecture(files, apiCalls, buildTools)
+      architecture.isFast = fast
+      console.log(`🏗️ Created architecture with ${architecture.layers.length} layers (${fast ? 'fast' : 'full'})`)
+      return architecture
+    })()
+
+    if (useCache) analysisPromiseCache.set(cacheKey, analysisPromise)
+
+    try {
+      const result = await analysisPromise
+      if (useCache) {
+        analysisResultCache.set(cacheKey, result)
+        analysisPromiseCache.delete(cacheKey)
+      }
+      return result
+    } catch (e) {
+      analysisPromiseCache.delete(cacheKey)
+      throw e
+    }
   }
 
   /**
    * Fetch repository files with content analysis
    */
-  private async fetchRepositoryFiles(owner: string, repo: string): Promise<Array<{path: string, content: string, type: string}>> {
+  private async fetchRepositoryFiles(owner: string, repo: string, opts?: { fast?: boolean }): Promise<Array<{path: string, content: string, type: string}>> {
     const files: Array<{path: string, content: string, type: string}> = []
+    const fast = !!opts?.fast
     
     // Get repository contents recursively
     const contents = await this.getDirectoryContents(owner, repo, '')
@@ -133,28 +175,38 @@ export class EnhancedAnalyzer {
       /docker-compose/,
       /.*\.md$/
     ]
-
+    const targetLimit = fast ? 30 : 60
+    const selected: GitHubFile[] = []
     for (const file of contents) {
-      if (file.type === 'file') {
-        const isPriority = priorityPatterns.some(pattern => pattern.test(file.path))
-        
-        if (isPriority || files.length < 50) { // Limit total files analyzed
-          try {
-            const contentResponse = await GitHubAPI.getFileContent(owner, repo, file.path)
-            if (contentResponse.data && contentResponse.data.content) {
-              files.push({
-                path: file.path,
-                content: contentResponse.data.content,
-                type: this.getFileType(file.path)
-              })
-              this.fileContents.set(file.path, contentResponse.data.content)
-            }
-          } catch (error) {
-            console.warn(`Failed to fetch content for ${file.path}:`, error)
+      if (file.type !== 'file') continue
+      const isPriority = priorityPatterns.some(p => p.test(file.path))
+      if (isPriority || selected.length < targetLimit) {
+        selected.push(file)
+        if (selected.length >= targetLimit && fast) break
+      }
+    }
+
+    const concurrency = fast ? 4 : 8
+    let index = 0
+    const worker = async () => {
+      while (index < selected.length) {
+        const current = selected[index++]
+        try {
+          const contentResponse = await GitHubAPI.getFileContent(owner, repo, current.path)
+          if (contentResponse.data && contentResponse.data.content) {
+            files.push({
+              path: current.path,
+              content: contentResponse.data.content,
+              type: this.getFileType(current.path)
+            })
+            this.fileContents.set(current.path, contentResponse.data.content)
           }
+        } catch (err) {
+          console.warn(`Failed to fetch content for ${current.path}:`, err)
         }
       }
     }
+    await Promise.all(Array.from({ length: concurrency }, () => worker()))
 
     return files
   }

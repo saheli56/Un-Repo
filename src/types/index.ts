@@ -216,3 +216,34 @@ export interface ThemeConfig {
   showMinimap: boolean
   showLineNumbers: boolean
 }
+
+// Type structure visualization (interfaces, type aliases, enums, classes)
+export interface TypeNode {
+  id: string
+  name: string
+  kind: 'interface' | 'type' | 'enum' | 'class'
+  file: string
+  properties?: Array<{ name: string; type: string }>
+  extends?: string[]
+  implements?: string[]
+  dependsOn: string[] // referenced types in properties or signatures
+  position?: { x: number; y: number } // layout position (assigned client-side)
+}
+
+export interface TypeEdge {
+  id: string
+  source: string
+  target: string
+  relation: 'extends' | 'implements' | 'uses'
+}
+
+export interface TypeGraph {
+  nodes: TypeNode[]
+  edges: TypeEdge[]
+  stats: {
+    interfaces: number
+    types: number
+    enums: number
+    classes: number
+  }
+}
