@@ -40,16 +40,21 @@ export function VisualizationDashboard({
   const loadArchitecture = useCallback(async () => {
     setArchitectureLoading(true)
     setArchitectureError(null)
-    
     try {
-      console.log('🏗️ Loading architecture analysis...')
-      const result = await enhancedAnalyzer.analyzeRepository(repo.owner, repo.name)
-      setArchitecture(result)
-      console.log('✅ Architecture analysis completed')
+      console.log('🏗️ Loading FAST architecture analysis...')
+      // Fast pass
+      const fastResult = await enhancedAnalyzer.analyzeRepository(repo.owner, repo.name, { fast: true })
+      setArchitecture(fastResult)
+      setArchitectureLoading(false)
+      console.log('⚡ Fast architecture ready, starting full analysis upgrade...')
+      // Fire and forget full upgrade
+      enhancedAnalyzer.analyzeRepository(repo.owner, repo.name, { fast: false }).then(full => {
+        setArchitecture(prev => (prev && prev.isFast ? full : prev))
+        console.log('✅ Full architecture upgrade completed')
+      }).catch(err => console.warn('Full architecture upgrade failed:', err))
     } catch (error) {
       console.error('❌ Architecture analysis failed:', error)
       setArchitectureError(error instanceof Error ? error.message : 'Failed to analyze architecture')
-    } finally {
       setArchitectureLoading(false)
     }
   }, [repo.owner, repo.name])
@@ -245,7 +250,15 @@ export function VisualizationDashboard({
                   </div>
                 </div>
               ) : architecture ? (
-                <ArchitectureVisualizer architecture={architecture} />
+                <div className="space-y-2">
+                  {architecture.isFast && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground px-2 py-1 bg-amber-50 border border-amber-200 rounded w-fit">
+                      <span className="font-medium text-amber-700">Preview</span>
+                      <span>Fast architecture view loading full details…</span>
+                    </div>
+                  )}
+                  <ArchitectureVisualizer architecture={architecture} />
+                </div>
               ) : (
                 <div className="flex items-center justify-center py-12">
                   <div className="text-center space-y-4">
