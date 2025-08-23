@@ -70,88 +70,78 @@ class ForceSimulation {
     return nodes
   }
 
+  // Pyramid layout based on code execution flow or file structure
   private createNewcomerFriendlyLayout(nodes: DraggableComponent[]) {
-    // Define clear, logical zones for each layer
-    const layerConfig = {
-      'external': {
-        x: 80,
-        y: 120,
-        width: 280,
-        title: 'External Services',
-        color: '#FF5252',
-        maxCols: 2,
-        spacing: 25
-      },
-      'runtime': {
-        x: 400,
-        y: 120,
-        width: 200,
-        title: 'Browser Runtime',
-        color: '#2196F3',
-        maxCols: 1,
-        spacing: 25
-      },
-      'development': {
-        x: 650,
-        y: 120,
-        width: 350,
-        title: 'Development Tools',
-        color: '#9C27B0',
-        maxCols: 3,
-        spacing: 20
-      },
-      'static': {
-        x: 80,
-        y: 380,
-        width: 400,
-        title: 'Static Assets',
-        color: '#4CAF50',
-        maxCols: 3,
-        spacing: 20
-      },
-      'source': {
-        x: 520,
-        y: 380,
-        width: 480,
-        title: 'Source Components',
-        color: '#FF9800',
-        maxCols: 4,
-        spacing: 18
-      }
-    }
+    // Find entry points (top of pyramid)
+  const entryNodes = nodes.filter(n => /app\.(t|j)sx?$/i.test(n.name) || n.purpose?.toLowerCase().includes('entry'))
+    // Group by layers for vertical separation
+    // (Layer grouping logic reserved for future smarter ordering)
 
-    // Group nodes by layer
-    const layerGroups = new Map<string, DraggableComponent[]>()
-    nodes.forEach(node => {
-      if (!layerGroups.has(node.layer)) {
-        layerGroups.set(node.layer, [])
+    // Pyramid: entry points at top, then main components, then dependencies/assets, then external
+    const width = this.width
+    const nodeWidth = 140
+    const nodeHeight = 75
+    const verticalSpacing = 120
+    const horizontalSpacing = 60
+
+    // 1. Entry points (top row)
+    entryNodes.forEach((node, i) => {
+      node.position = {
+        x: width / 2 - (entryNodes.length * (nodeWidth + horizontalSpacing)) / 2 + i * (nodeWidth + horizontalSpacing),
+        y: 60
       }
-      layerGroups.get(node.layer)!.push(node)
+      node.size = { width: nodeWidth, height: nodeHeight }
     })
 
-    // Position each layer in organized grid
-    Object.entries(layerConfig).forEach(([layerId, config]) => {
-      const layerNodes = layerGroups.get(layerId) || []
-      if (layerNodes.length === 0) return
+    // 2. Main components (second row)
+    const mainComponents = nodes.filter(n => n.type === 'component' && !entryNodes.includes(n))
+    mainComponents.forEach((node, i) => {
+      node.position = {
+        x: width / 2 - (mainComponents.length * (nodeWidth + horizontalSpacing)) / 2 + i * (nodeWidth + horizontalSpacing),
+        y: 60 + verticalSpacing
+      }
+      node.size = { width: nodeWidth, height: nodeHeight }
+    })
 
-      const nodeWidth = 140
-      const nodeHeight = 75
-      const { x: startX, y: startY, maxCols, spacing } = config
+    // 3. Services/utilities (third row)
+  const serviceNodes = nodes.filter(n => n.type === 'service')
+    serviceNodes.forEach((node, i) => {
+      node.position = {
+        x: width / 2 - (serviceNodes.length * (nodeWidth + horizontalSpacing)) / 2 + i * (nodeWidth + horizontalSpacing),
+        y: 60 + 2 * verticalSpacing
+      }
+      node.size = { width: nodeWidth, height: nodeHeight }
+    })
 
-      // Calculate grid layout
-      const cols = Math.min(maxCols, layerNodes.length)
+    // 4. Static assets/configs (fourth row)
+    const assetNodes = nodes.filter(n => n.type === 'asset' || n.type === 'config')
+    assetNodes.forEach((node, i) => {
+      node.position = {
+        x: width / 2 - (assetNodes.length * (nodeWidth + horizontalSpacing)) / 2 + i * (nodeWidth + horizontalSpacing),
+        y: 60 + 3 * verticalSpacing
+      }
+      node.size = { width: nodeWidth, height: nodeHeight }
+    })
 
-      layerNodes.forEach((node, index) => {
-        const col = index % cols
-        const row = Math.floor(index / cols)
-        
-        node.position = {
-          x: startX + (col * (nodeWidth + spacing)),
-          y: startY + (row * (nodeHeight + spacing))
-        }
-        
-        node.size = { width: nodeWidth, height: nodeHeight }
-      })
+    // 5. External services (bottom row)
+    const externalNodes = nodes.filter(n => n.layer === 'external')
+    externalNodes.forEach((node, i) => {
+      node.position = {
+        x: width / 2 - (externalNodes.length * (nodeWidth + horizontalSpacing)) / 2 + i * (nodeWidth + horizontalSpacing),
+        y: 60 + 4 * verticalSpacing
+      }
+      node.size = { width: nodeWidth, height: nodeHeight }
+    })
+
+    // 6. Any remaining nodes (source, type, etc.)
+    const placed = new Set([...entryNodes, ...mainComponents, ...serviceNodes, ...assetNodes, ...externalNodes])
+    const remaining = nodes.filter(n => !placed.has(n))
+    remaining.forEach((node, i) => {
+      node.position = {
+        x: width / 2 - (remaining.length * (nodeWidth + horizontalSpacing)) / 2 + i * (nodeWidth + horizontalSpacing),
+        y: 60 + 5 * verticalSpacing
+      }
+      node.size = { width: nodeWidth, height: nodeHeight }
     })
   }
 
@@ -213,6 +203,199 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
   // Route layout mode (hierarchical router -> pages) per new requirement
   const routeLayout = true
   const [syntheticConnections, setSyntheticConnections] = useState<ArchitectureConnection[]>([])
+  // View mode: 'architecture' (existing) or 'file-tree' (new pyramid hierarchy)
+  const [viewMode, setViewMode] = useState<'architecture' | 'file-tree'>('architecture')
+
+  // ================= File Tree Pyramid Mode State =================
+  interface FileTreeNode {
+    id: string // unique id (directory path or file path, root = 'root')
+    name: string
+    path: string // full path relative to repo root
+    type: 'directory' | 'file'
+    parentId: string | null
+    depth: number
+    expanded: boolean
+    visible: boolean
+    position: { x: number; y: number }
+    size: { width: number; height: number }
+    color: string
+  }
+  interface FileTreeConnection { id: string; source: string; target: string }
+  const [fileNodes, setFileNodes] = useState<Record<string, FileTreeNode>>({})
+  const [fileConnections, setFileConnections] = useState<FileTreeConnection[]>([])
+  const fileTreeBuiltRef = useRef(false)
+  // Version counter to trigger layout recalculation without depending on full fileNodes object (prevents shake loops)
+  const [layoutVersion, setLayoutVersion] = useState(0)
+  const fileNodesRef = useRef<Record<string, FileTreeNode>>({})
+
+  // Build initial file tree structure (lazy on first switch to file-tree)
+  useEffect(() => {
+    if (viewMode !== 'file-tree') return
+    if (fileTreeBuiltRef.current) return
+
+    const allPaths = new Set<string>()
+    architecture.components.forEach(c => c.files.forEach(f => allPaths.add(f)))
+    architecture.staticAssets.forEach(f => allPaths.add(f))
+    // Include some root-level important config files (already in components typically)
+    ;['package.json','vite.config.ts','tsconfig.json','index.html'].forEach(f => allPaths.add(f))
+
+    // Helper maps
+    const nodes: Record<string, FileTreeNode> = {}
+
+    const ensureDir = (dirPath: string) => {
+      const id = dirPath === '' ? 'root' : dirPath
+      if (nodes[id]) return nodes[id]
+      const depth = dirPath === '' ? 0 : dirPath.split('/').length
+      const name = dirPath === '' ? 'Un-Repo' : dirPath.split('/').pop() || 'dir'
+      nodes[id] = {
+        id,
+        name,
+        path: dirPath,
+        type: 'directory',
+        parentId: dirPath === '' ? null : (dirPath.includes('/') ? dirPath.substring(0, dirPath.lastIndexOf('/')) || '' : '' ) || 'root',
+        depth,
+        expanded: depth === 0, // root expanded by default
+        visible: depth <= 1, // root + its first level initially visible
+        position: { x: 0, y: 0 },
+        size: { width: 180, height: 70 },
+        color: depth === 0 ? '#1E3A8A' : '#2563EB'
+      }
+      return nodes[id]
+    }
+
+    // Always create root
+    ensureDir('')
+
+    // Ensure directories for each path
+    Array.from(allPaths).forEach(p => {
+      const parts = p.split('/')
+      // Directories: all but last if last is file
+      parts.forEach((_seg, idx) => {
+        const sub = parts.slice(0, idx + 1).join('/')
+        // If last part has a dot, treat as file later
+        if (idx === parts.length - 1 && /\.[A-Za-z0-9]+$/.test(sub.split('/').pop() || '')) return
+        ensureDir(sub)
+      })
+    })
+
+    // Create immediate children for root (src, public, any root files as file nodes hidden until their parent expanded)
+    const createFileNode = (filePath: string) => {
+      const parentPath = filePath.includes('/') ? filePath.substring(0, filePath.lastIndexOf('/')) : ''
+      const parentId = parentPath === '' ? 'root' : parentPath
+      const depth = filePath.split('/').length
+      const name = filePath.split('/').pop() || filePath
+      if (nodes[filePath]) return
+      nodes[filePath] = {
+        id: filePath,
+        name,
+        path: filePath,
+        type: 'file',
+        parentId,
+        depth,
+        expanded: false,
+        visible: false, // only visible when its directory expanded
+        position: { x: 0, y: 0 },
+        size: { width: 160, height: 54 },
+        color: '#6B7280'
+      }
+    }
+
+    Array.from(allPaths).forEach(p => {
+      // create file nodes
+      if (/\.[A-Za-z0-9]+$/.test(p.split('/').pop() || '')) createFileNode(p)
+    })
+
+    // After building nodes, mark first-level directories visible
+    Object.values(nodes).forEach(n => {
+      if (n.depth === 1) n.visible = true
+    })
+
+    fileTreeBuiltRef.current = true
+    setFileNodes(nodes)
+    fileNodesRef.current = nodes
+    setLayoutVersion(v => v + 1)
+  }, [viewMode, architecture.components, architecture.staticAssets])
+
+  // Toggle directory expansion / collapse
+  const toggleDirectory = (id: string) => {
+    setFileNodes(prev => {
+      const dir = prev[id]
+      if (!dir || dir.type !== 'directory') return prev
+      const updated: Record<string, FileTreeNode> = { ...prev }
+      const willExpand = !dir.expanded
+      updated[id] = { ...dir, expanded: willExpand }
+      // Show/hide direct children
+      Object.values(prev).forEach(child => {
+        if (child.parentId === (dir.path === '' ? 'root' : dir.path)) {
+          if (willExpand) {
+            updated[child.id] = { ...child, visible: true }
+          } else {
+            // Collapse recursively
+            const collapseRec = (nid: string) => {
+              const node = updated[nid]
+              if (!node) return
+              if (node.id !== id) updated[nid] = { ...node, visible: false, expanded: false }
+              Object.values(updated).forEach(grand => { if (grand.parentId === (node.path === '' ? 'root' : node.path)) collapseRec(grand.id) })
+            }
+            collapseRec(child.id)
+          }
+        }
+      })
+      // Trigger layout recalculation
+      setLayoutVersion(v => v + 1)
+      fileNodesRef.current = updated
+      return updated
+    })
+  }
+
+  // Layout visible file nodes into pyramid rows (root at top, deeper levels wider) whenever visibility changes
+  // Layout recalculation effect using ref snapshot to avoid dependency churn
+  useEffect(() => {
+    if (viewMode !== 'file-tree') return
+    setFileNodes(prev => {
+      let changed = false
+      const nodes = { ...prev }
+      const depthGroups: Record<number, FileTreeNode[]> = {}
+      Object.values(nodes).forEach(n => { if (n.visible) { depthGroups[n.depth] = depthGroups[n.depth] || []; depthGroups[n.depth].push(n) } })
+      const depths = Object.keys(depthGroups).map(Number).sort((a,b)=>a-b)
+      const canvasWidth = 1600
+      const startY = 80
+      const vSpacing = 130
+      depths.forEach((d, idx) => {
+        const row = depthGroups[d]
+        row.sort((a,b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === 'directory' ? -1 : 1))
+        const nodeWidth = 170
+        const hSpacing = Math.max(30, 60 - idx * 2)
+        const totalWidth = row.length * nodeWidth + (row.length - 1) * hSpacing
+        const startX = (canvasWidth - totalWidth) / 2
+        row.forEach((n, i) => {
+          const newPosX = startX + i * (nodeWidth + hSpacing)
+            const newPosY = startY + idx * vSpacing
+            if (n.position.x !== newPosX || n.position.y !== newPosY || n.size.width !== nodeWidth) {
+              changed = true
+              nodes[n.id] = { ...n, position: { x: newPosX, y: newPosY }, size: { width: nodeWidth, height: n.type === 'directory' ? 70 : 54 } }
+            }
+        })
+      })
+      if (changed) {
+        fileNodesRef.current = nodes
+        return nodes
+      }
+      return prev
+    })
+    // Rebuild connections based on latest snapshot (no dependency loop)
+    setFileConnections(() => {
+      const conns: FileTreeConnection[] = []
+      const snapshot = fileNodesRef.current
+      Object.values(snapshot).forEach(n => {
+        if (!n.visible || !n.parentId) return
+        const parentId = n.parentId === '' ? 'root' : n.parentId
+        const parent = snapshot[parentId]
+        if (parent && parent.visible) conns.push({ id: parent.id + '->' + n.id, source: parent.id, target: n.id })
+      })
+      return conns
+    })
+  }, [viewMode, layoutVersion])
 
   // Build synthetic "routes to" connections and reposition nodes for hierarchical layout
   useEffect(() => {
@@ -560,12 +743,12 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
     }
   }
 
-  // Create smooth, curved paths for connections that avoid overlapping
+  // Create smooth, curved paths for connections that avoid overlapping, and add arrowheads
   const getConnectionPath = (connection: ArchitectureConnection) => {
     const sourceComp = components.find(c => c.id === connection.source)
     const targetComp = components.find(c => c.id === connection.target)
     
-    if (!sourceComp || !targetComp) return ''
+    if (!sourceComp || !targetComp) return { path: '', marker: '' }
 
     // Use dragged position if component is being dragged
     const sourcePos = (dragState.draggedId === sourceComp.id && draggedComponentPosition) 
@@ -606,7 +789,14 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
       controlY2 = targetY - (dy > 0 ? controlOffset : -controlOffset)
     }
 
-    return `M ${sourceX} ${sourceY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${targetX} ${targetY}`
+    // Choose marker based on highlight
+    const isHighlighted = highlightedConnections.has(connection.id)
+    const marker = isHighlighted ? 'url(#arrowhead-highlighted)' : 'url(#arrowhead)'
+
+    return {
+      path: `M ${sourceX} ${sourceY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${targetX} ${targetY}`,
+      marker
+    }
   }
 
   // Educational content generators for newcomers
@@ -741,6 +931,21 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
           {/* Enhanced Controls Row 1 */}
           <div className="flex flex-wrap gap-2">
             <div className="flex gap-1">
+              {/* View Mode Toggle */}
+              <Button
+                size="sm"
+                variant={viewMode === 'architecture' ? 'default' : 'outline'}
+                onClick={() => setViewMode('architecture')}
+                className="px-2"
+                title="Architecture Mode"
+              >Arch</Button>
+              <Button
+                size="sm"
+                variant={viewMode === 'file-tree' ? 'default' : 'outline'}
+                onClick={() => setViewMode('file-tree')}
+                className="px-2"
+                title="File Tree Pyramid"
+              >Files</Button>
               <Button
                 size="sm"
                 variant="outline"
@@ -816,43 +1021,50 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
 
           {/* Connection Controls - NEW UX ENHANCEMENT */}
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Network className="h-4 w-4" />
-              <span className="text-sm font-medium">Connection Visibility</span>
-              <Badge variant="outline" className="ml-auto">
-                {connectionFilter === 'all' ? 'All' : connectionFilter}
-              </Badge>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { key: 'all', label: 'All', icon: '🔗' },
-                { key: 'imports', label: 'Imports', icon: '📦' },
-                { key: 'api', label: 'API Calls', icon: '🌐' },
-                { key: 'config', label: 'Config', icon: '⚙️' },
-                { key: 'build', label: 'Build', icon: '🔧' }
-              ].map(filter => (
-                <Button
-                  key={filter.key}
-                  size="sm"
-                  variant={connectionFilter === filter.key ? "default" : "outline"}
-                  onClick={() => setConnectionFilter(filter.key as 'all' | 'imports' | 'api' | 'config' | 'build')}
-                  className="px-3 text-xs h-8"
-                >
-                  <span className="mr-1">{filter.icon}</span>
-                  {filter.label}
-                </Button>
-              ))}
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant={showConnectionLabels ? "default" : "outline"}
-                onClick={() => setShowConnectionLabels(!showConnectionLabels)}
-                className="px-3 text-xs h-8"
-              >
-                {showConnectionLabels ? '🏷️ Labels On' : '🏷️ Labels Off'}
-              </Button>
-            </div>
+            {viewMode === 'architecture' && (
+              <>
+                <div className="flex items-center gap-2">
+                  <Network className="h-4 w-4" />
+                  <span className="text-sm font-medium">Connection Visibility</span>
+                  <Badge variant="outline" className="ml-auto">
+                    {connectionFilter === 'all' ? 'All' : connectionFilter}
+                  </Badge>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { key: 'all', label: 'All', icon: '🔗' },
+                    { key: 'imports', label: 'Imports', icon: '📦' },
+                    { key: 'api', label: 'API Calls', icon: '🌐' },
+                    { key: 'config', label: 'Config', icon: '⚙️' },
+                    { key: 'build', label: 'Build', icon: '🔧' }
+                  ].map(filter => (
+                    <Button
+                      key={filter.key}
+                      size="sm"
+                      variant={connectionFilter === filter.key ? "default" : "outline"}
+                      onClick={() => setConnectionFilter(filter.key as 'all' | 'imports' | 'api' | 'config' | 'build')}
+                      className="px-3 text-xs h-8"
+                    >
+                      <span className="mr-1">{filter.icon}</span>
+                      {filter.label}
+                    </Button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={showConnectionLabels ? "default" : "outline"}
+                    onClick={() => setShowConnectionLabels(!showConnectionLabels)}
+                    className="px-3 text-xs h-8"
+                  >
+                    {showConnectionLabels ? '🏷️ Labels On' : '🏷️ Labels Off'}
+                  </Button>
+                </div>
+              </>
+            )}
+            {viewMode === 'file-tree' && (
+              <div className="text-xs text-muted-foreground italic">File Tree Mode: click directories to expand/collapse. Pyramid widens with depth.</div>
+            )}
           </div>
 
           {/* Layer Controls */}
@@ -861,40 +1073,45 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
               <Layers className="h-4 w-4" />
               <span className="text-sm font-medium">Architecture Layers</span>
               <Badge variant="outline" className="ml-auto">
-                {visibleLayers.size}/{architecture.layers.length} visible
+                {viewMode === 'architecture' ? `${visibleLayers.size}/${architecture.layers.length} visible` : `${Object.values(fileNodes).filter(n=>n.visible && n.type==='directory').length} dirs`}
               </Badge>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-              {architecture.layers.map(layer => (
-                <Button
-                  key={layer.id}
-                  size="sm"
-                  variant={visibleLayers.has(layer.id) ? "default" : "outline"}
-                  onClick={() => toggleLayer(layer.id)}
-                  className="px-3 text-xs h-8"
-                >
-                  {visibleLayers.has(layer.id) ? (
-                    <Eye className="h-3 w-3 mr-1" />
-                  ) : (
-                    <EyeOff className="h-3 w-3 mr-1" />
-                  )}
-                  {layer.name}
-                  <Badge variant="secondary" className="ml-1 text-xs">
-                    {components.filter(c => c.layer === layer.id).length}
-                  </Badge>
-                </Button>
-              ))}
-            </div>
+            {viewMode === 'architecture' && (
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                {architecture.layers.map(layer => (
+                  <Button
+                    key={layer.id}
+                    size="sm"
+                    variant={visibleLayers.has(layer.id) ? "default" : "outline"}
+                    onClick={() => toggleLayer(layer.id)}
+                    className="px-3 text-xs h-8"
+                  >
+                    {visibleLayers.has(layer.id) ? (
+                      <Eye className="h-3 w-3 mr-1" />
+                    ) : (
+                      <EyeOff className="h-3 w-3 mr-1" />
+                    )}
+                    {layer.name}
+                    <Badge variant="secondary" className="ml-1 text-xs">
+                      {components.filter(c => c.layer === layer.id).length}
+                    </Badge>
+                  </Button>
+                ))}
+              </div>
+            )}
+            {viewMode === 'file-tree' && (
+              <div className="text-xs text-muted-foreground pl-1">Layer toggles hidden (showing pure filesystem)</div>
+            )}
           </div>
 
           {/* Enhanced Stats */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
             <div className="text-center">
-              <div className="font-semibold text-xl text-blue-600">{components.length}</div>
-              <div className="text-muted-foreground">Components</div>
+              <div className="font-semibold text-xl text-blue-600">{viewMode === 'architecture' ? components.length : Object.values(fileNodes).filter(n=>n.visible).length}</div>
+              <div className="text-muted-foreground">{viewMode === 'architecture' ? 'Components' : 'Visible Nodes'}</div>
             </div>
             <div className="text-center">
-              <div className="font-semibold text-xl text-purple-600">{architecture.connections.length}</div>
+              <div className="font-semibold text-xl text-purple-600">{viewMode === 'architecture' ? architecture.connections.length : fileConnections.length}</div>
               <div className="text-muted-foreground">Connections</div>
             </div>
             <div className="text-center">
@@ -906,8 +1123,8 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
               <div className="text-muted-foreground">Build Tools</div>
             </div>
             <div className="text-center">
-              <div className="font-semibold text-xl text-red-600">{visibleLayers.size}</div>
-              <div className="text-muted-foreground">Active Layers</div>
+              <div className="font-semibold text-xl text-red-600">{viewMode === 'architecture' ? visibleLayers.size : Object.values(fileNodes).filter(n=>n.visible && n.type==='directory').length}</div>
+              <div className="text-muted-foreground">{viewMode === 'architecture' ? 'Active Layers' : 'Visible Dirs'}</div>
             </div>
           </div>
 
@@ -1132,7 +1349,7 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
               </g>
 
               {/* Subtle layer indicators - non-restrictive guides */}
-              {architecture.layers.map((layer, index) => {
+              {viewMode === 'architecture' && architecture.layers.map((layer, index) => {
                 const isVisible = visibleLayers.has(layer.id)
                 
                 return (
@@ -1183,7 +1400,7 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
               })}
 
               {/* Combined connections with dynamic hover + filter highlighting behavior */}
-              {allConnections
+              {viewMode === 'architecture' && allConnections
                 .filter(connection => {
                   const sourceComp = components.find(c => c.id === connection.source)
                   const targetComp = components.find(c => c.id === connection.target)
@@ -1197,7 +1414,7 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
                   return true
                 })
                 .map(connection => {
-                  const path = getConnectionPath(connection)
+                  const { path, marker } = getConnectionPath(connection)
                   if (!path) return null
                   const isHighlighted = highlightedConnections.has(connection.id)
                   const isIncident = hoveredComponent && (connection.source === hoveredComponent || connection.target === hoveredComponent)
@@ -1242,7 +1459,7 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
                         strokeWidth={strokeWidth}
                         strokeDasharray={baseStyle.strokeDasharray}
                         opacity={opacity}
-                        markerEnd={isIncident || typeMatch ? "url(#arrowhead-highlighted)" : "url(#arrowhead)"}
+                        markerEnd={marker}
                         className="drop-shadow-sm hover:cursor-pointer transition-all duration-300"
                       />
 
@@ -1292,7 +1509,7 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
                 })}
 
               {/* Enhanced Components with improved styling */}
-              {components.map(component => {
+              {viewMode === 'architecture' && components.map(component => {
                 const isSelected = selectedComponent?.id === component.id
                 const isDragged = dragState.draggedId === component.id
                 const isVisible = visibleLayers.has(component.layer)
@@ -1431,13 +1648,53 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
                   </g>
                 )
               })}
+              {viewMode === 'file-tree' && (
+                <>
+                  {/* File tree connections */}
+                  {fileConnections.map(fc => {
+                    const s = fileNodes[fc.source]
+                    const t = fileNodes[fc.target]
+                    if (!s || !t || !s.visible || !t.visible) return null
+                    const sx = s.position.x + s.size.width/2
+                    const sy = s.position.y + s.size.height
+                    const tx = t.position.x + t.size.width/2
+                    const ty = t.position.y
+                    const midY = (sy + ty)/2
+                    const path = `M ${sx} ${sy} C ${sx} ${midY}, ${tx} ${midY}, ${tx} ${ty}`
+                    return <path key={fc.id} d={path} fill="none" stroke="#6366F1" strokeWidth={3} markerEnd="url(#arrowhead)" opacity={0.9} />
+                  })}
+                  {/* File tree nodes */}
+                  {Object.values(fileNodes).filter(n=>n.visible).map(node => {
+                    const isDir = node.type === 'directory'
+                    return (
+                      <g key={node.id} transform={`translate(${node.position.x}, ${node.position.y})`} className="cursor-pointer" onClick={() => isDir && toggleDirectory(node.id === 'root' ? '' : node.path)}>
+                        <rect
+                          width={node.size.width}
+                          height={node.size.height}
+                          rx={12}
+                          fill={isDir ? node.color : '#F3F4F6'}
+                          stroke={isDir ? '#1E40AF' : '#6B7280'}
+                          strokeWidth={isDir ? 2.5 : 1.5}
+                          className="transition-all duration-200 hover:shadow-lg"
+                        />
+                        <text x={node.size.width/2} y={node.size.height/2 - 4} textAnchor="middle" style={{ fontSize: '14px', fontWeight: 600, fill: isDir ? '#FFFFFF' : '#111827' }}>
+                          {node.id === 'root' ? 'Un-Repo' : node.name}
+                        </text>
+                        <text x={node.size.width/2} y={node.size.height/2 + 14} textAnchor="middle" style={{ fontSize: '11px', fill: isDir ? '#DBEAFE' : '#4B5563' }}>
+                          {isDir ? (node.expanded ? 'collapse' : 'expand') : 'file'}
+                        </text>
+                      </g>
+                    )
+                  })}
+                </>
+              )}
             </svg>
           </div>
         </CardContent>
       </Card>
 
       {/* Comprehensive Educational Component Details Panel */}
-      {selectedComponent && (
+      {viewMode === 'architecture' && selectedComponent && (
         <Card className="mt-4">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
