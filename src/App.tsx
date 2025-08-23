@@ -2,20 +2,16 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { RepoInput } from '@/components/repo/RepoInput'
-import { RepoVisualizer } from '@/components/repo/RepoVisualizer'
 import { VisualizationDashboard } from '@/components/visualization/VisualizationDashboard'
 import { WorkflowOverview } from '@/components/repo/WorkflowOverview'
 import { FileExplorer } from '@/components/file/FileExplorer'
 import { CodeViewer } from '@/components/code/CodeViewer'
 import { AIPanel } from '@/components/ai/AIPanel'
-import { WalkthroughPanel } from '@/components/walkthrough/WalkthroughPanel'
 import { AdvancedSearch } from '@/components/search/AdvancedSearch'
-import { BookmarksManager } from '@/components/bookmarks/BookmarksManager'
 import { GitHubSettings } from '@/components/settings/GitHubSettings'
 import { GeminiSettings } from '@/components/settings/GeminiSettings'
-import { EnhancedVisualizationDemo } from '@/components/demo/EnhancedVisualizationDemo'
 import { GitHubRepo, FileNode, RepoAnalysis } from '@/types'
-import { Github, Code, Brain, TreePine, BookOpen, Bookmark, Key, ArrowLeft, ArrowRight, Sparkles } from 'lucide-react'
+import { Github, Code, TreePine, Key, ArrowLeft, ArrowRight } from 'lucide-react'
 import { analyzeRepository } from '@/lib/utils'
 
 interface AppState {
@@ -23,9 +19,9 @@ interface AppState {
   repoAnalysis: RepoAnalysis | null
   selectedFile: FileNode | null
   isLoading: boolean
-  view: 'input' | 'explorer' | 'visualizer' | 'interactive' | 'walkthrough' | 'bookmarks' | 'settings' | 'demo'
+  view: 'input' | 'explorer' | 'interactive' | 'settings'
   darkMode: boolean
-  navigationHistory: Array<'input' | 'explorer' | 'visualizer' | 'interactive' | 'walkthrough' | 'bookmarks' | 'settings' | 'demo'>
+  navigationHistory: Array<'input' | 'explorer' | 'interactive' | 'settings'>
 }
 
 export default function App() {
@@ -231,7 +227,9 @@ export default function App() {
             )}
           </div>
           
-          <div className="flex items-center space-x-2">
+          {/* Right side: Navigation buttons and Auth buttons */}
+          <div className="flex items-center space-x-4">
+            {/* Explorer, Interactive, and API buttons */}
             {state.currentRepo && (
               <div className="flex items-center space-x-1">
                 <Button
@@ -244,15 +242,6 @@ export default function App() {
                   Explorer
                 </Button>
                 <Button
-                  variant={state.view === 'visualizer' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => navigateToView('visualizer')}
-                  className={`cursor-pointer hover:scale-105 transition-transform duration-200 ${state.view === 'visualizer' ? 'border-b-2 border-primary' : ''}`}
-                >
-                  <Brain className="h-4 w-4 mr-1" />
-                  Visualizer
-                </Button>
-                <Button
                   variant={state.view === 'interactive' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => navigateToView('interactive')}
@@ -261,38 +250,11 @@ export default function App() {
                   <TreePine className="h-4 w-4 mr-1" />
                   Interactive
                 </Button>
-                <Button
-                  variant={state.view === 'walkthrough' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => navigateToView('walkthrough')}
-                  className={`cursor-pointer hover:scale-105 transition-transform duration-200 ${state.view === 'walkthrough' ? 'border-b-2 border-primary' : ''}`}
-                >
-                  <BookOpen className="h-4 w-4 mr-1" />
-                  Walkthrough
-                </Button>
               </div>
             )}
             
-            {/* Enhanced Button Group for Demo, Bookmarks, and API */}
-            <div className="flex items-center justify-center space-x-4 bg-card/50 px-4 py-2 rounded-lg shadow-md">
-              <Button
-                variant={state.view === 'demo' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => navigateToView('demo')}
-                className={`cursor-pointer hover:scale-110 transition-transform duration-200 ${state.view === 'demo' ? 'border-b-2 border-primary' : ''}`}
-              >
-                <Sparkles className="h-4 w-4 mr-1" />
-                Demo
-              </Button>
-              <Button
-                variant={state.view === 'bookmarks' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => navigateToView('bookmarks')}
-                className={`cursor-pointer hover:scale-110 transition-transform duration-200 ${state.view === 'bookmarks' ? 'border-b-2 border-primary' : ''}`}
-              >
-                <Bookmark className="h-4 w-4 mr-1" />
-                Bookmarks
-              </Button>
+            {/* API Settings Button */}
+            <div className="flex items-center justify-center bg-card/50 px-4 py-2 rounded-lg shadow-md">
               <Button
                 variant={state.view === 'settings' ? 'default' : 'ghost'}
                 size="sm"
@@ -303,39 +265,39 @@ export default function App() {
                 API
               </Button>
             </div>
-          </div>
 
-          {/* Login, Sign Up, and Profile Buttons */}
-          <div className="flex items-center space-x-2">
-            {!isLoggedIn ? (
-              <>
+            {/* Login, Sign Up, and Profile Buttons */}
+            <div className="flex items-center space-x-2">
+              {!isLoggedIn ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => alert('Login functionality to be implemented')}
+                    className="cursor-pointer hover:scale-105 transition-transform duration-200"
+                  >
+                    Login
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => alert('Sign Up functionality to be implemented')}
+                    className="cursor-pointer hover:scale-105 transition-transform duration-200"
+                  >
+                    Sign Up
+                  </Button>
+                </>
+              ) : (
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => alert('Login functionality to be implemented')}
+                  onClick={() => alert('Profile functionality to be implemented')}
                   className="cursor-pointer hover:scale-105 transition-transform duration-200"
                 >
-                  Login
+                  Profile
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => alert('Sign Up functionality to be implemented')}
-                  className="cursor-pointer hover:scale-105 transition-transform duration-200"
-                >
-                  Sign Up
-                </Button>
-              </>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => alert('Profile functionality to be implemented')}
-                className="cursor-pointer hover:scale-105 transition-transform duration-200"
-              >
-                Profile
-              </Button>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -367,7 +329,7 @@ export default function App() {
               <WorkflowOverview
                 repo={state.currentRepo!}
                 analysis={state.repoAnalysis}
-                onViewWorkflow={() => navigateToView('visualizer')}
+                onViewWorkflow={() => navigateToView('interactive')}
               />
               
               {/* Traditional Explorer Layout */}
@@ -407,22 +369,6 @@ export default function App() {
             </motion.div>
           )}
 
-          {state.view === 'visualizer' && state.repoAnalysis && (
-            <motion.div
-              key="visualizer"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="h-[calc(100vh-200px)]"
-            >
-              <RepoVisualizer
-                repo={state.currentRepo!}
-                analysis={state.repoAnalysis}
-                onNodeSelect={(file) => setState(prev => ({ ...prev, selectedFile: file }))}
-              />
-            </motion.div>
-          )}
-
           {state.view === 'interactive' && state.repoAnalysis && (
             <motion.div
               key="interactive"
@@ -437,48 +383,6 @@ export default function App() {
                 onFileSelect={(file) => setState(prev => ({ ...prev, selectedFile: file }))}
                 selectedFile={state.selectedFile}
               />
-            </motion.div>
-          )}
-
-          {state.view === 'walkthrough' && state.repoAnalysis && (
-            <motion.div
-              key="walkthrough"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="h-[calc(100vh-200px)]"
-            >
-              <WalkthroughPanel
-                repo={state.currentRepo!}
-                analysis={state.repoAnalysis}
-              />
-            </motion.div>
-          )}
-
-          {state.view === 'bookmarks' && (
-            <motion.div
-              key="bookmarks"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="overflow-auto"
-            >
-              <BookmarksManager
-                currentRepo={state.currentRepo || undefined}
-                onRepoSelect={(repo) => handleRepoSubmit(repo as GitHubRepo)}
-              />
-            </motion.div>
-          )}
-
-          {state.view === 'demo' && (
-            <motion.div
-              key="demo"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="overflow-auto"
-            >
-              <EnhancedVisualizationDemo />
             </motion.div>
           )}
 
