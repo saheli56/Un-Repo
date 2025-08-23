@@ -37,13 +37,12 @@ interface ArchitectureVisualizerProps {
 // Enhanced Force simulation for perfect default layout
 class ForceSimulation {
   private nodes: DraggableComponent[]
-  private connections: ArchitectureConnection[]
   private width: number
   private height: number
 
-  constructor(nodes: DraggableComponent[], connections: ArchitectureConnection[], width: number, height: number) {
+  constructor(nodes: DraggableComponent[], _connections: ArchitectureConnection[], width: number, height: number) {
     this.nodes = nodes
-    this.connections = connections
+    // _connections parameter is kept for future use but not currently needed for layout
     this.width = width
     this.height = height
   }
@@ -211,6 +210,48 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
   const [connectionFilter, setConnectionFilter] = useState<'all' | 'imports' | 'api' | 'config' | 'build'>('all')
   const [hoveredComponent, setHoveredComponent] = useState<string | null>(null)
   const [showConnectionLabels, setShowConnectionLabels] = useState(true)
+  // Route layout mode (hierarchical router -> pages) per new requirement
+  const routeLayout = true
+  const [syntheticConnections, setSyntheticConnections] = useState<ArchitectureConnection[]>([])
+
+  // Build synthetic "routes to" connections and reposition nodes for hierarchical layout
+  useEffect(() => {
+    if (!routeLayout || components.length === 0) return
+    // Identify potential router root (App.tsx / App.jsx)
+    const root = components.find(c => /app\.(t|j)sx?$/i.test(c.name))
+    if (!root) return
+    // Candidate page components: other source layer components (excluding assets/tools) with width>0
+    const pageCandidates = components.filter(c => c.id !== root.id && c.layer === 'source')
+    // Layout: root centered top, pages in a horizontal row below
+    const width = 1600
+    const rowY = root.position.y + 160
+    const pageWidth = 130
+    const spacing = 40
+    const totalWidth = pageCandidates.length * (pageWidth + spacing) - spacing
+    const startX = (width - totalWidth) / 2
+    // Position root
+    root.position = { x: (width / 2) - 90, y: 80 }
+    root.size = { width: 180, height: 70 }
+    pageCandidates.forEach((p, idx) => {
+      p.position = { x: startX + idx * (pageWidth + spacing), y: rowY }
+      p.size = { width: pageWidth, height: 60 }
+    })
+    // Create synthetic connections
+    const synthetic: ArchitectureConnection[] = pageCandidates.map(p => ({
+      id: `route-${root.id}-${p.id}`,
+      source: root.id,
+      target: p.id,
+      type: 'import',
+      label: 'routes to',
+      description: `Router renders ${p.name}`,
+      style: 'dashed',
+      color: '#64748B'
+    }))
+    setSyntheticConnections(synthetic)
+    // Update components state to trigger re-render with new positions
+    setComponents([...components])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [components.length])
 
   // Initialize components with stable positioning to prevent glitching
   useEffect(() => {
@@ -294,7 +335,8 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
     }, 50) // 50ms debounce
 
     return () => clearTimeout(initTimeout)
-  }, [architecture.components, architecture.connections]) // Removed problematic dependencies
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [architecture.components.length, architecture.connections.length]) // Only re-init when component count changes
 
   // Handle zoom
   const handleZoom = (delta: number) => {
@@ -668,6 +710,17 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
     return `🔗 Connected Component: This component has ${incoming} incoming and ${outgoing} outgoing connections, making it an integrated part of your application's data flow.`
   }
 
+  // Combine real architecture connections with synthetic route connections (when enabled)
+  // This ensures we still display ALL original relationships while overlaying the simplified "routes to" hierarchy.
+  const allConnections: ArchitectureConnection[] = routeLayout 
+    ? (() => {
+        const merged: Record<string, ArchitectureConnection> = {}
+        architecture.connections.forEach(c => { merged[c.id] = c })
+        syntheticConnections.forEach(c => { merged[c.id] = c })
+        return Object.values(merged)
+      })()
+    : architecture.connections
+
   return (
     <div className={`w-full ${className}`}>
       {/* Enhanced Controls */}
@@ -858,18 +911,11 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
             </div>
           </div>
 
-          {/* Interaction Tips */}
-          <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-              <div>🖱️ <strong>Drag nodes</strong> to reposition components</div>
-              <div>🎯 <strong>Click nodes</strong> to see details and connections</div>
-              <div>👁️ <strong>Toggle layers</strong> to focus on specific areas</div>
-            </div>
-          </div>
+          {/* (Interaction tips removed as requested) */}
         </CardContent>
       </Card>
 
-      {/* Enhanced Main Visualization */}
+      {/* Main Visualization */}
       <Card>
         <CardContent className="p-0">
           <div 
@@ -961,7 +1007,7 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
               </defs>
               <rect width="100%" height="100%" fill="url(#grid)" />
 
-              {/* Clean, compact legend - positioned top-left */}
+              {/* Clean, beginner-friendly legend - positioned top-left */}
               <g className="legend" transform="translate(20, 20)">
                 <rect
                   x="0"
@@ -976,36 +1022,108 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
                 />
                 
                 <text
-                  x="12"
-                  y="18"
-                  className="fill-gray-800 text-sm font-semibold"
-                  style={{ fontSize: '12px', fontWeight: '600' }}
+                  x="20"
+                  y="22"
+                  className="fill-gray-800 text-base font-bold"
+                  style={{ fontSize: '14px', fontWeight: '700' }}
                 >
-                  CONNECTION TYPES
+                  � BEGINNER'S GUIDE
                 </text>
                 
-                {/* Compact connection legend */}
+                {/* Component types explanation */}
+                <text
+                  x="20"
+                  y="42"
+                  className="fill-gray-700 text-sm font-semibold"
+                  style={{ fontSize: '12px', fontWeight: '600' }}
+                >
+                  Component Types:
+                </text>
+                
                 {[
-                  { type: 'imports', color: '#00e676', label: 'Imports' },
-                  { type: 'api', color: '#ff4081', label: 'API Calls' },
-                  { type: 'config', color: '#ffc107', label: 'Config' },
-                  { type: 'build', color: '#9c27b0', label: 'Build Tools' }
-                ].map((conn, idx) => (
-                  <g key={conn.type} transform={`translate(0, ${28 + idx * 22})`}>
-                    <line
-                      x1="12"
-                      y1="4"
-                      x2="35"
-                      y2="4"
-                      stroke={conn.color}
-                      strokeWidth="3"
-                      markerEnd="url(#arrowhead)"
+                  { emoji: '🌐', layer: 'runtime', name: 'Browser', description: 'Where your app runs', color: '#3B82F6' },
+                  { emoji: '⚡', layer: 'source', name: 'Your Code', description: 'Files you wrote', color: '#F59E0B' },
+                  { emoji: '🔧', layer: 'development', name: 'Dev Tools', description: 'Build & test tools', color: '#8B5CF6' },
+                  { emoji: '📁', layer: 'static', name: 'Assets', description: 'Images, styles, etc.', color: '#22C55E' },
+                ].map((comp, idx) => (
+                  <g key={comp.layer} transform={`translate(0, ${52 + idx * 22})`}>
+                    <circle
+                      cx="30"
+                      cy="8"
+                      r="8"
+                      fill={comp.color}
+                      className="opacity-90"
                     />
                     <text
-                      x="42"
-                      y="8"
-                      className="fill-gray-700 text-xs"
-                      style={{ fontSize: '11px', fontWeight: '500' }}
+                      x="30"
+                      y="12"
+                      className="text-white text-xs font-bold"
+                      textAnchor="middle"
+                      style={{ fontSize: '10px' }}
+                    >
+                      {comp.emoji}
+                    </text>
+                    <text
+                      x="45"
+                      y="12"
+                      className="fill-gray-800 text-sm font-semibold"
+                      style={{ fontSize: '11px', fontWeight: '600' }}
+                    >
+                      {comp.name}
+                    </text>
+                    <text
+                      x="110"
+                      y="12"
+                      className="fill-gray-600 text-xs"
+                      style={{ fontSize: '10px' }}
+                    >
+                      {comp.description}
+                    </text>
+                  </g>
+                ))}
+                
+                {/* Connection types explanation */}
+                <text
+                  x="20"
+                  y="158"
+                  className="fill-gray-700 text-sm font-semibold"
+                  style={{ fontSize: '12px', fontWeight: '600' }}
+                >
+                  Connection Types:
+                </text>
+                
+                {[
+                  { type: 'imports', color: '#8B5CF6', label: 'Code Imports', description: 'One component uses another' },
+                  { type: 'api', color: '#F59E0B', label: 'API Calls', description: 'Fetches data from services' },
+                  { type: 'config', color: '#EF4444', label: 'Configuration', description: 'Settings and setup files' }
+                ].map((conn, idx) => (
+                  <g key={conn.type} transform={`translate(0, ${168 + idx * 18})`}>
+                    {/* Enhanced arrow with animation hint */}
+                    <line
+                      x1="20"
+                      y1="8"
+                      x2="40"
+                      y2="8"
+                      stroke={conn.color}
+                      strokeWidth="3"
+                      markerEnd={`url(#arrowhead-${conn.type})`}
+                      className="drop-shadow-sm"
+                    />
+                    {/* Flow dot animation preview */}
+                    <circle r="1.5" fill={conn.color} opacity="0.7" cx="30" cy="8">
+                      <animate
+                        attributeName="cx"
+                        values="20;40;20"
+                        dur="3s"
+                        repeatCount="indefinite"
+                      />
+                    </circle>
+                    
+                    <text
+                      x="50"
+                      y="12"
+                      className="fill-gray-800 text-sm font-semibold"
+                      style={{ fontSize: '11px', fontWeight: '600' }}
                     >
                       {conn.label}
                     </text>
@@ -1064,76 +1182,114 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
                 )
               })}
 
-              {/* Enhanced Connections with smart filtering and hover effects */}
-              {architecture.connections
+              {/* Combined connections with dynamic hover + filter highlighting behavior */}
+              {allConnections
                 .filter(connection => {
-                  // Smart connection filtering based on user selection
-                  if (connectionFilter === 'all') return true
-                  if (connectionFilter === 'imports' && connection.type === 'import') return true
-                  if (connectionFilter === 'api' && (connection.type === 'http' || connection.label.toLowerCase().includes('api'))) return true
-                  if (connectionFilter === 'config' && (connection.type === 'config' || connection.label.toLowerCase().includes('config'))) return true
-                  if (connectionFilter === 'build' && (connection.type === 'build' || connection.type === 'transform' || connection.label.toLowerCase().includes('build'))) return true
-                  return false
-                })
-                .filter(connection => {
-                  // Hide connections between invisible layers
                   const sourceComp = components.find(c => c.id === connection.source)
                   const targetComp = components.find(c => c.id === connection.target)
                   if (!sourceComp || !targetComp) return false
-                  return visibleLayers.has(sourceComp.layer) && visibleLayers.has(targetComp.layer)
-                })
-                .filter(connection => {
-                  // Show only connections related to hovered component for better focus
-                  if (!hoveredComponent) return true
-                  return connection.source === hoveredComponent || connection.target === hoveredComponent
+                  if (!visibleLayers.has(sourceComp.layer) || !visibleLayers.has(targetComp.layer)) return false
+                  // Hover rule: if hovering a component, only show incident edges
+                  if (hoveredComponent) {
+                    return connection.source === hoveredComponent || connection.target === hoveredComponent
+                  }
+                  // Otherwise show everything
+                  return true
                 })
                 .map(connection => {
-                const style = getConnectionStyle(connection)
-                const path = getConnectionPath(connection)
-                const isHighlighted = highlightedConnections.has(connection.id)
-                const isRelatedToHover = hoveredComponent && (connection.source === hoveredComponent || connection.target === hoveredComponent)
+                  const path = getConnectionPath(connection)
+                  if (!path) return null
+                  const isHighlighted = highlightedConnections.has(connection.id)
+                  const isIncident = hoveredComponent && (connection.source === hoveredComponent || connection.target === hoveredComponent)
 
-                if (!path) return null
+                  // Connection type matching for filter highlighting (do NOT hide non-matching, just dim)
+                  const matchesFilter = (filter: string, conn: ArchitectureConnection) => {
+                    if (filter === 'all') return true
+                    const label = (conn.label || '').toLowerCase()
+                    switch(filter) {
+                      case 'imports': return conn.type === 'import'
+                      case 'api': return conn.type === 'http' || label.includes('api')
+                      case 'config': return conn.type === 'config' || label.includes('config')
+                      case 'build': return conn.type === 'build' || conn.type === 'transform' || label.includes('build')
+                      default: return true
+                    }
+                  }
+                  const typeMatch = matchesFilter(connectionFilter, connection)
 
-                return (
-                  <g key={connection.id} className="transition-all duration-300">
-                    <path
-                      d={path}
-                      fill="none"
-                      {...style}
-                      stroke={isRelatedToHover ? '#FF6B35' : style.stroke} // Orange highlight for hover
-                      strokeWidth={isRelatedToHover ? '4' : (isHighlighted ? '3' : style.strokeWidth)}
-                      opacity={hoveredComponent && !isRelatedToHover ? 0.2 : (isHighlighted ? 1 : 0.8)}
-                      markerEnd={isHighlighted ? "url(#arrowhead-highlighted)" : "url(#arrowhead)"}
-                      className="drop-shadow-sm hover:cursor-pointer"
-                    />
-                    {/* Smart connection labels - only show when useful */}
-                    {showConnectionLabels && connection.label && (isHighlighted || isRelatedToHover) && (
-                      <g>
-                        <rect
-                          x={0} y={0}
-                          width={connection.label.length * 7 + 8}
-                          height={18}
-                          fill="rgba(255, 255, 255, 0.95)"
-                          stroke="rgba(0, 0, 0, 0.1)"
-                          strokeWidth="1"
-                          rx="6"
-                          className="drop-shadow-md"
-                          transform={`translate(${components.find(c => c.id === connection.source)?.position.x || 0}, ${(components.find(c => c.id === connection.source)?.position.y || 0) - 25})`}
-                        />
-                        <text
-                          x={4}
-                          y={12}
-                          className="fill-gray-800 text-xs font-semibold"
-                          transform={`translate(${components.find(c => c.id === connection.source)?.position.x || 0}, ${(components.find(c => c.id === connection.source)?.position.y || 0) - 25})`}
-                        >
-                          {connection.label}
-                        </text>
-                      </g>
-                    )}
-                  </g>
-                )
-              })}
+                  // Base style
+                  const baseStyle = getConnectionStyle(connection)
+
+                  // Opacity logic
+                  let opacity = 0.85
+                  if (hoveredComponent) {
+                    // When hovering: only incident edges are rendered; highlight type matches stronger
+                    opacity = typeMatch || connectionFilter === 'all' ? 1 : 0.25
+                  } else {
+                    // Not hovering: show all; dim non-type matches if a specific filter chosen
+                    if (connectionFilter !== 'all' && !typeMatch) opacity = 0.12
+                    else opacity = typeMatch && connectionFilter !== 'all' ? 1 : 0.7
+                  }
+
+                  const strokeColor = (isIncident ? '#FF6B35' : (typeMatch && connectionFilter !== 'all' ? '#FF6B35' : baseStyle.stroke))
+                  const strokeWidth = isIncident ? 4 : (typeMatch && connectionFilter !== 'all' ? 4 : (isHighlighted ? 4 : baseStyle.strokeWidth))
+
+                  return (
+                    <g key={connection.id} className="transition-all duration-300">
+                      <path
+                        d={path}
+                        fill="none"
+                        stroke={strokeColor}
+                        strokeWidth={strokeWidth}
+                        strokeDasharray={baseStyle.strokeDasharray}
+                        opacity={opacity}
+                        markerEnd={isIncident || typeMatch ? "url(#arrowhead-highlighted)" : "url(#arrowhead)"}
+                        className="drop-shadow-sm hover:cursor-pointer transition-all duration-300"
+                      />
+
+                      {/* Flow animation only for incident edges */}
+                      {isIncident && (
+                        <circle r="3" fill="#FF6B35" opacity="0.8">
+                          <animateMotion dur="2s" repeatCount="indefinite" path={path} />
+                          <animate attributeName="r" values="2;4;2" dur="1.5s" repeatCount="indefinite" />
+                        </circle>
+                      )}
+
+                      {/* Information box for incident edges OR selected highlight */}
+                      {showConnectionLabels && connection.label && (isIncident || isHighlighted) && (() => {
+                        const sourceComp = components.find(c => c.id === connection.source)
+                        const targetComp = components.find(c => c.id === connection.target)
+                        if (!sourceComp || !targetComp) return null
+                        const sourcePos = (dragState.draggedId === sourceComp.id && draggedComponentPosition) ? draggedComponentPosition : sourceComp.position
+                        const targetPos = (dragState.draggedId === targetComp.id && draggedComponentPosition) ? draggedComponentPosition : targetComp.position
+                        const midX = (sourcePos.x + sourceComp.size.width/2 + targetPos.x + targetComp.size.width/2) / 2
+                        const midY = (sourcePos.y + sourceComp.size.height/2 + targetPos.y + targetComp.size.height/2) / 2
+                        return (
+                          <g transform={`translate(${midX - connection.label.length * 3.5}, ${midY - 9})`}>
+                            <rect
+                              x={0}
+                              y={0}
+                              width={connection.label.length * 7 + 12}
+                              height={20}
+                              fill="rgba(255, 255, 255, 0.95)"
+                              stroke="rgba(74, 144, 226, 0.3)"
+                              strokeWidth="1"
+                              rx="8"
+                              className="drop-shadow-md"
+                            />
+                            <text
+                              x={6}
+                              y={14}
+                              className="fill-gray-800 text-xs font-semibold"
+                              style={{ fontSize: '11px' }}
+                            >
+                              {connection.label}
+                            </text>
+                          </g>
+                        )
+                      })()}
+                    </g>
+                  )
+                })}
 
               {/* Enhanced Components with improved styling */}
               {components.map(component => {
