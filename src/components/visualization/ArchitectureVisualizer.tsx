@@ -90,7 +90,7 @@ class ForceSimulation {
     const nodeHeight = 75
     const verticalSpacing = 120
     const horizontalSpacing = 60
-    const leftMargin = 200 // Increased left margin to ensure nodes stay well within bounds
+    const leftMargin = 300 // Increased left margin to ensure nodes stay well within bounds
 
     // Helper function to calculate safe row positioning
     const calculateRowPositions = (rowNodes: DraggableComponent[], rowWidth: number) => {
@@ -213,7 +213,7 @@ class ForceSimulation {
   }
 
   private keepInBounds(node: DraggableComponent) {
-    const margin = 150  // Large margin to ensure nodes stay well within visible bounds
+    const margin = 200  // Large margin to ensure nodes stay well within visible bounds
     node.position.x = Math.max(margin, Math.min(this.width - node.size.width - margin, node.position.x))
     node.position.y = Math.max(100, Math.min(this.height - node.size.height - margin, node.position.y))
   }
@@ -224,7 +224,7 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
   const containerRef = useRef<HTMLDivElement>(null)
   const lastMouseMoveRef = useRef<number>(0)
   const [scale, setScale] = useState(0.8)
-  const [pan, setPan] = useState({ x: -100, y: -50 }) // Shift content right and slightly down
+  const [pan, setPan] = useState({ x: 50, y: -50 }) // Shift content right and slightly down
   const [selectedComponent, setSelectedComponent] = useState<ArchitectureComponent | null>(null)
   const [visibleLayers, setVisibleLayers] = useState<Set<string>>(
     new Set(architecture.layers.map(layer => layer.id))
@@ -555,7 +555,7 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
       // Apply force simulation only on first load for better default layout
       if (autoLayout && !isLayoutLocked && components.length === 0) {
         try {
-          const simulation = new ForceSimulation(initialComponents, architecture.connections, 1600, 950)
+          const simulation = new ForceSimulation(initialComponents, architecture.connections, 2000, 950)
           const optimizedComponents = simulation.applyForces(30) // Fewer iterations for stability
           setComponents(optimizedComponents)
         } catch (error) {
@@ -582,7 +582,7 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
   // Handle reset view
   const handleReset = () => {
     setScale(0.8)
-    setPan({ x: -100, y: -50 }) // Use the same centered position as initial state
+    setPan({ x: 50, y: -50 }) // Use the same centered position as initial state
     setSelectedComponent(null)
     setHighlightedConnections(new Set())
   }
@@ -591,7 +591,7 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
   const applyAutoLayout = useCallback(() => {
     if (isLayoutLocked) return
     
-    const simulation = new ForceSimulation(components, architecture.connections, 1600, 950) // Match viewBox dimensions
+    const simulation = new ForceSimulation(components, architecture.connections, 2000, 950) // Match viewBox dimensions
     const optimizedComponents = simulation.applyForces(100)
     setComponents(optimizedComponents)
   }, [components, architecture.connections, isLayoutLocked])
@@ -1263,7 +1263,7 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
               ref={svgRef}
               width="100%"
               height="950"
-              viewBox={`${-pan.x} ${-pan.y} ${1600 / scale} ${950 / scale}`}
+              viewBox={`${-pan.x} ${-pan.y} ${2000 / scale} ${950 / scale}`}
               className="w-full h-[950px] cursor-crosshair"
               onMouseMove={handleMouseMove}
               style={{ 
