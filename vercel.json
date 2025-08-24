@@ -1,13 +1,13 @@
 {
   "functions": {
     "api/auth/login.js": {
-      "runtime": "@vercel/node@3.0.0"
+      "runtime": "@vercel/node@2.15.10"
     },
     "api/auth/callback.js": {
-      "runtime": "@vercel/node@3.0.0"
+      "runtime": "@vercel/node@2.15.10"
     },
     "api/health.js": {
-      "runtime": "@vercel/node@3.0.0"
+      "runtime": "@vercel/node@2.15.10"
     }
   },
   "rewrites": [
