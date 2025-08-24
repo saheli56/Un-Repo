@@ -5,12 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { FileNode, GitHubRepo } from '@/types'
 import { InteractiveFileTree } from './InteractiveFileTree'
-import { FileNetwork } from './FileNetwork'
 import { ArchitectureVisualizer } from './ArchitectureVisualizer'
 import { enhancedAnalyzer, SystemArchitecture } from '@/lib/enhanced-analyzer'
 import { 
   TreePine, 
-  Network, 
   BarChart3, 
   Info, 
   Layers,
@@ -149,15 +147,7 @@ export function VisualizationDashboard({
                 <TreePine className="h-4 w-4" />
                 Tree View
               </Button>
-              <Button
-                variant={activeTab === 'network' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveTab('network')}
-                className="flex items-center gap-2"
-              >
-                <Network className="h-4 w-4" />
-                Network View
-              </Button>
+              {/* Network View removed */}
               <Button
                 variant={activeTab === 'architecture' ? 'default' : 'outline'}
                 size="sm"
@@ -206,14 +196,7 @@ export function VisualizationDashboard({
             />
           )}
 
-          {activeTab === 'network' && (
-            <FileNetwork
-              repo={repo}
-              structure={structure}
-              onFileSelect={onFileSelect}
-              selectedFile={selectedFile}
-            />
-          )}
+          {/* Network View removed */}
 
           {activeTab === 'architecture' && (
             <div className="p-4">
@@ -296,13 +279,7 @@ export function VisualizationDashboard({
                 <div className="text-muted-foreground">Hierarchical file structure with expand/collapse functionality</div>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <Network className="h-5 w-5 text-blue-500 mt-0.5" />
-              <div>
-                <div className="font-medium">Network View</div>
-                <div className="text-muted-foreground">Interactive node-based visualization with progressive expansion</div>
-              </div>
-            </div>
+            {/* Network View tip removed */}
             <div className="flex items-start gap-3">
               <Layers className="h-5 w-5 text-purple-500 mt-0.5" />
               <div>
