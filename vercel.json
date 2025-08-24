@@ -1,0 +1,27 @@
+{
+  "functions": {
+    "api/auth/login.js": {
+      "runtime": "nodejs20.x"
+    },
+    "api/auth/callback.js": {
+      "runtime": "nodejs20.x"
+    },
+    "api/health.js": {
+      "runtime": "nodejs20.x"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/auth/login",
+      "destination": "/api/auth/login.js"
+    },
+    {
+      "source": "/api/auth/callback",
+      "destination": "/api/auth/callback.js"
+    },
+    {
+      "source": "/api/health",
+      "destination": "/api/health.js"
+    }
+  ]
+}
