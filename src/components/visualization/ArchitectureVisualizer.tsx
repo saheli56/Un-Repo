@@ -685,7 +685,7 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
     }
   }
 
-  // Handle component click - open GitHub file and show details
+  // Handle component click
   const handleComponentClick = (component: ArchitectureComponent) => {
     if (dragState.isDragging) return
     
@@ -696,15 +696,6 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
       conn => conn.source === component.id || conn.target === component.id
     )
     setHighlightedConnections(new Set(relatedConnections.map(conn => conn.id)))
-
-    // Open the primary file in GitHub if available
-    if (component.files.length > 0 && repo) {
-      const primaryFile = component.files[0] // Use the first file as primary
-      const githubUrl = `https://github.com/${repo.owner}/${repo.name}/blob/main/${primaryFile}`
-      
-      // Open in a new tab
-      window.open(githubUrl, '_blank', 'noopener,noreferrer')
-    }
 
     // Fetch AI explanation if Gemini API is available
     if (GeminiAnalyzer.hasApiKey() && repo) {
@@ -1455,8 +1446,8 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
                 <rect
                   x="0"
                   y="0"
-                  width="280"
-                  height="270"
+                  width="220"
+                  height="120"
                   fill="rgba(255, 255, 255, 0.98)"
                   stroke="rgba(74, 144, 226, 0.4)"
                   strokeWidth="1"
@@ -1572,44 +1563,6 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
                     </text>
                   </g>
                 ))}
-
-                {/* Interaction instructions */}
-                <text
-                  x="20"
-                  y="220"
-                  className="fill-gray-700 text-sm font-semibold"
-                  style={{ fontSize: '12px', fontWeight: '600' }}
-                >
-                  Interactions:
-                </text>
-                
-                <g transform="translate(0, 230)">
-                  <circle
-                    cx="30"
-                    cy="8"
-                    r="10"
-                    fill="#24292e"
-                    stroke="#ffffff"
-                    strokeWidth="2"
-                  />
-                  <text
-                    x="30"
-                    y="12"
-                    className="text-white text-xs"
-                    textAnchor="middle"
-                    style={{ fontSize: '8px' }}
-                  >
-                    📁
-                  </text>
-                  <text
-                    x="50"
-                    y="12"
-                    className="fill-gray-800 text-sm font-semibold"
-                    style={{ fontSize: '11px', fontWeight: '600' }}
-                  >
-                    Click components to open files in GitHub
-                  </text>
-                </g>
               </g>
 
               {/* Subtle layer indicators - non-restrictive guides */}
@@ -1786,7 +1739,7 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
                 return (
                   <g
                     key={component.id}
-                    className={`architecture-component transition-all duration-300 ${
+                    className={`architecture-component transition-transform duration-100 ${
                       isLayoutLocked ? 'cursor-pointer' : 'cursor-grab'
                     } ${isDragged ? 'dragging cursor-grabbing' : ''} ${hoveredComponent === component.id ? 'hovered' : ''}`}
                     onClick={() => handleComponentClick(component)}
@@ -1796,8 +1749,7 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
                     style={{ 
                       opacity: isVisible ? 1 : 0.3,
                       transform: isDragged ? 'scale(1.05)' : hoveredComponent === component.id ? 'scale(1.02)' : 'scale(1)',
-                      transformOrigin: 'center',
-                      cursor: component.files.length > 0 ? 'pointer' : (isLayoutLocked ? 'pointer' : 'grab')
+                      transformOrigin: 'center'
                     }}
                   >
                     {/* Enhanced component background with modern styling */}
@@ -1875,41 +1827,16 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
                       {component.purpose}
                     </text>
 
-                    {/* GitHub link indicator (appears on hover if files exist) */}
-                    {hoveredComponent === component.id && component.files.length > 0 && (
-                      <g>
-                        <circle
-                          cx={position.x + component.size.width - 15}
-                          cy={position.y + 15}
-                          r="12"
-                          fill="#24292e"
-                          stroke="#ffffff"
-                          strokeWidth="2"
-                          className="animate-pulse cursor-pointer"
-                        />
-                        <text
-                          x={position.x + component.size.width - 15}
-                          y={position.y + 20}
-                          className="fill-white text-sm font-bold"
-                          textAnchor="middle"
-                          style={{ fontSize: '10px', pointerEvents: 'none' }}
-                        >
-                          📁
-                        </text>
-                        <title>Click to open {component.files[0]} in GitHub</title>
-                      </g>
-                    )}
-
-                    {/* File extension indicator */}
+                    {/* File extension indicator instead of unclear tech badges */}
                     {component.files[0] && (
                       <text
-                        x={position.x + component.size.width - 40}
-                        y={position.y + component.size.height - 10}
-                        className="fill-gray-500 text-xs font-medium opacity-70"
+                        x={position.x + component.size.width - 15}
+                        y={position.y + 20}
+                        className="fill-blue-600 text-xs font-bold"
                         textAnchor="middle"
                         style={{ 
-                          fontSize: '9px',
-                          fontWeight: '500'
+                          fontSize: '10px',
+                          fontWeight: 'bold'
                         }}
                       >
                         {component.files[0].split('.').pop()?.toUpperCase().substring(0, 3) || 'FILE'}
