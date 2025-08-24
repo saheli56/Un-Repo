@@ -862,13 +862,13 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
     
     let baseColor = component.color
     
-    // Layer-specific color enhancements
+    // Enhanced, vibrant color scheme
     const layerColors = {
-      'runtime': '#E3F2FD',      // Light blue
-      'development': '#F3E5F5',   // Light purple
-      'static': '#E8F5E8',       // Light green
-      'source': '#FFF3E0',       // Light orange
-      'external': '#FFEBEE'      // Light red
+      'runtime': '#4FC3F7',      // Modern sky blue
+      'development': '#BA68C8',   // Vibrant purple  
+      'static': '#4DD0E1',       // Bright cyan
+      'source': '#81C784',       // Fresh green
+      'external': '#F06292'      // Coral pink
     }
     
     baseColor = layerColors[component.layer as keyof typeof layerColors] || baseColor
@@ -1424,10 +1424,11 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
                 </filter>
               </defs>
 
-              {/* Grid background */}
+              {/* Enhanced grid background */}
               <defs>
-                <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
-                  <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#e5e7eb" strokeWidth="1" opacity="0.3"/>
+                <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+                  <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#e5e7eb" strokeWidth="1" opacity="0.2"/>
+                  <circle cx="30" cy="30" r="1" fill="#d1d5db" opacity="0.3"/>
                 </pattern>
               </defs>
               <rect width="100%" height="100%" fill="url(#grid)" />
@@ -1747,57 +1748,64 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
                     onMouseLeave={() => setHoveredComponent(null)}
                     style={{ 
                       opacity: isVisible ? 1 : 0.3,
-                      transform: isDragged ? 'scale(1.02)' : 'scale(1)',
+                      transform: isDragged ? 'scale(1.05)' : hoveredComponent === component.id ? 'scale(1.02)' : 'scale(1)',
                       transformOrigin: 'center'
                     }}
                   >
-                    {/* Enhanced component background with hover effects */}
+                    {/* Enhanced component background with modern styling */}
                     <rect
                       x={position.x}
                       y={position.y}
                       width={component.size.width}
                       height={component.size.height}
                       fill={getComponentColor(component)}
-                      stroke={isSelected ? "#FF1744" : isDragged ? "#FFB74D" : (hoveredComponent === component.id ? "#FF6B35" : "#4A90E2")}
-                      strokeWidth={isSelected ? 4 : isDragged ? 3 : (hoveredComponent === component.id ? 3 : 2)}
-                      rx="12"
+                      stroke={isSelected ? "#FF1744" : isDragged ? "#FFD700" : (hoveredComponent === component.id ? "#FF6B35" : "#ffffff")}
+                      strokeWidth={isSelected ? 3 : isDragged ? 3 : (hoveredComponent === component.id ? 2 : 1)}
+                      rx="16"
+                      ry="16"
                       filter={isSelected ? "url(#glow)" : "url(#dropshadow)"}
-                      className="hover:brightness-110"
+                      className="transition-all duration-300 hover:brightness-110"
                       style={{
-                        filter: hoveredComponent === component.id ? 'drop-shadow(0 8px 16px rgba(0,0,0,0.15))' : undefined
+                        filter: hoveredComponent === component.id ? 'drop-shadow(0 8px 20px rgba(0,0,0,0.2))' : undefined
                       }}
                     />
                     
-                    {/* Component type icon */}
+                    {/* Enhanced component type icon */}
                     <circle
                       cx={position.x + 25}
                       cy={position.y + 25}
-                      r="12"
-                      fill={component.color || '#4A90E2'}
-                      className="opacity-90 drop-shadow-sm"
+                      r="14"
+                      fill="#ffffff"
+                      stroke={component.color || '#4A90E2'}
+                      strokeWidth="2"
+                      className="drop-shadow-md"
                     />
                     
-                    {/* Component type indicator */}
+                    {/* Component type emoji */}
                     <text
                       x={position.x + 25}
-                      y={position.y + 30}
-                      className="fill-white text-xs font-bold"
+                      y={position.y + 31}
+                      className="text-lg"
                       textAnchor="middle"
-                      style={{ fontSize: '10px' }}
+                      style={{ fontSize: '12px' }}
                     >
-                      {component.type.charAt(0).toUpperCase()}
+                      {component.layer === 'runtime' ? '🌐' : 
+                       component.layer === 'source' ? '⚡' :
+                       component.layer === 'development' ? '🔧' :
+                       component.layer === 'static' ? '📁' : 
+                       component.layer === 'external' ? '🔗' : '📦'}
                     </text>
                     
-                    {/* Enhanced component name */}
+                    {/* Enhanced component name with better typography */}
                     <text
                       x={position.x + component.size.width / 2}
                       y={position.y + component.size.height / 2 - 8}
-                      className="fill-gray-800 text-base font-bold"
+                      className="fill-white text-base font-bold"
                       textAnchor="middle"
                       style={{ 
-                        fontSize: '14px',
+                        fontSize: '15px',
                         fontWeight: 'bold',
-                        textShadow: '1px 1px 2px rgba(255,255,255,0.8)',
+                        textShadow: '0 2px 4px rgba(0,0,0,0.5)',
                         opacity: isVisible ? 1 : 0.5 
                       }}
                     >
