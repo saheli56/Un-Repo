@@ -574,18 +574,39 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [architecture.components.length, architecture.connections.length]) // Only re-init when component count changes
 
-  // Handle zoom
-  const handleZoom = (delta: number) => {
-    setScale(prev => Math.max(0.1, Math.min(3, prev + delta)))
-  }
+  // Enhanced zoom with better increments
+  const handleZoom = useCallback((delta: number) => {
+    setScale(prev => Math.max(0.2, Math.min(5, prev + delta)))
+  }, [])
 
   // Handle reset view
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setScale(0.8)
     setPan({ x: 200, y: 50 }) // Center the content in the middle of the page
     setSelectedComponent(null)
     setHighlightedConnections(new Set())
-  }
+  }, [])
+
+  // Keyboard shortcuts for zoom
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === '=' || e.key === '+') {
+          e.preventDefault()
+          handleZoom(0.1)
+        } else if (e.key === '-') {
+          e.preventDefault()
+          handleZoom(-0.1)
+        } else if (e.key === '0') {
+          e.preventDefault()
+          handleReset()
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyPress)
+    return () => window.removeEventListener('keydown', handleKeyPress)
+  }, [handleZoom, handleReset])
 
   // Auto layout function
   const applyAutoLayout = useCallback(() => {
@@ -1059,22 +1080,56 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
               >Files</Button>
               <Button
                 size="sm"
-                variant="outline"
+                variant="default"
                 onClick={() => handleZoom(0.1)}
-                className="px-2"
-                title="Zoom In"
+                className="px-3 bg-blue-600 hover:bg-blue-700 text-white font-medium"
+                title="Zoom In (Current: ${Math.round(scale * 100)}%)"
               >
-                <ZoomIn className="h-4 w-4" />
+                <ZoomIn className="h-4 w-4 mr-1" />
+                Zoom In
               </Button>
               <Button
                 size="sm"
-                variant="outline"
+                variant="default"
                 onClick={() => handleZoom(-0.1)}
-                className="px-2"
-                title="Zoom Out"
+                className="px-3 bg-blue-600 hover:bg-blue-700 text-white font-medium"
+                title="Zoom Out (Current: ${Math.round(scale * 100)}%)"
               >
-                <ZoomOut className="h-4 w-4" />
+                <ZoomOut className="h-4 w-4 mr-1" />
+                Zoom Out
               </Button>
+              <div className="flex items-center px-2 py-1 bg-muted rounded text-sm font-mono">
+                {Math.round(scale * 100)}%
+              </div>
+              <div className="flex gap-1 ml-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setScale(0.5)}
+                  className="px-2 text-xs"
+                  title="50% Zoom"
+                >
+                  50%
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setScale(1)}
+                  className="px-2 text-xs"
+                  title="100% Zoom"
+                >
+                  100%
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setScale(1.5)}
+                  className="px-2 text-xs"
+                  title="150% Zoom"
+                >
+                  150%
+                </Button>
+              </div>
               <Button
                 size="sm"
                 variant="outline"
