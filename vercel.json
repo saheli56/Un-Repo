@@ -1,13 +1,13 @@
 {
   "functions": {
     "api/auth/login.js": {
-      "runtime": "nodejs20.x"
+      "runtime": "@vercel/node@3.0.0"
     },
     "api/auth/callback.js": {
-      "runtime": "nodejs20.x"
+      "runtime": "@vercel/node@3.0.0"
     },
     "api/health.js": {
-      "runtime": "nodejs20.x"
+      "runtime": "@vercel/node@3.0.0"
     }
   },
   "rewrites": [

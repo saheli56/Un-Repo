@@ -236,11 +236,15 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
     draggedId: string | null
     startPos: Position
     startComponentPos: Position
+    isPanning: boolean
+    startPan: Position
   }>({
     isDragging: false,
     draggedId: null,
     startPos: { x: 0, y: 0 },
-    startComponentPos: { x: 0, y: 0 }
+    startComponentPos: { x: 0, y: 0 },
+    isPanning: false,
+    startPan: { x: 0, y: 0 }
   })
   const [isLayoutLocked, setIsLayoutLocked] = useState(false)
   const [autoLayout] = useState(true)
@@ -726,18 +730,53 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
       isDragging: true,
       draggedId: component.id,
       startPos: { x: mouseX, y: mouseY },
-      startComponentPos: { x: component.position.x, y: component.position.y }
+      startComponentPos: { x: component.position.x, y: component.position.y },
+      isPanning: false,
+      startPan: { x: 0, y: 0 }
     })
   }, [scale, pan, isLayoutLocked])
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!dragState.isDragging || !dragState.draggedId || isLayoutLocked) return
+  const handleBackgroundMouseDown = useCallback((e: React.MouseEvent) => {
+    // Only start panning if not clicking on a component
+    if (e.target === e.currentTarget) {
+      const svgRect = svgRef.current?.getBoundingClientRect()
+      if (!svgRect) return
 
+      const mouseX = (e.clientX - svgRect.left) / scale + pan.x
+      const mouseY = (e.clientY - svgRect.top) / scale + pan.y
+
+      setDragState({
+        isDragging: false,
+        draggedId: null,
+        startPos: { x: mouseX, y: mouseY },
+        startComponentPos: { x: 0, y: 0 },
+        isPanning: true,
+        startPan: { x: pan.x, y: pan.y }
+      })
+    }
+  }, [scale, pan])
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const svgRect = svgRef.current?.getBoundingClientRect()
     if (!svgRect) return
 
     const mouseX = (e.clientX - svgRect.left) / scale + pan.x
     const mouseY = (e.clientY - svgRect.top) / scale + pan.y
+
+    // Handle background panning
+    if (dragState.isPanning) {
+      const deltaX = mouseX - dragState.startPos.x
+      const deltaY = mouseY - dragState.startPos.y
+
+      setPan({
+        x: dragState.startPan.x - deltaX,
+        y: dragState.startPan.y - deltaY
+      })
+      return
+    }
+
+    // Handle component dragging
+    if (!dragState.isDragging || !dragState.draggedId || isLayoutLocked) return
 
     const deltaX = mouseX - dragState.startPos.x
     const deltaY = mouseY - dragState.startPos.y
@@ -752,7 +791,7 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
     const newY = Math.max(20, Math.min(880, dragState.startComponentPos.y + deltaY))  // Full screen height
     
     setDraggedComponentPosition({ x: newX, y: newY })
-  }, [dragState, scale, pan, isLayoutLocked])
+  }, [dragState, scale, pan, isLayoutLocked, setPan])
 
   const handleMouseUp = useCallback(() => {
     if (dragState.isDragging && dragState.draggedId && draggedComponentPosition) {
@@ -767,13 +806,15 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
       setComponents(prev => prev.map(comp => ({ ...comp, isDragging: false })))
     }
     
-    // Reset drag states
+    // Reset drag states (both component dragging and panning)
     setDraggedComponentPosition(null)
     setDragState({
       isDragging: false,
       draggedId: null,
       startPos: { x: 0, y: 0 },
-      startComponentPos: { x: 0, y: 0 }
+      startComponentPos: { x: 0, y: 0 },
+      isPanning: false,
+      startPan: { x: 0, y: 0 }
     })
   }, [dragState, draggedComponentPosition])
 
@@ -1321,8 +1362,9 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
               viewBox={`${-pan.x} ${-pan.y} ${1800 / scale} ${950 / scale}`}
               className="w-full h-[950px] cursor-crosshair"
               onMouseMove={handleMouseMove}
+              onMouseDown={handleBackgroundMouseDown}
               style={{ 
-                cursor: dragState.isDragging ? 'grabbing' : 'default'
+                cursor: dragState.isDragging || dragState.isPanning ? 'grabbing' : 'default'
               }}
             >
               <defs>
@@ -1389,6 +1431,14 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
                 </pattern>
               </defs>
               <rect width="100%" height="100%" fill="url(#grid)" />
+
+              {/* Transparent background for panning */}
+              <rect 
+                width="100%" 
+                height="100%" 
+                fill="transparent" 
+                style={{ cursor: dragState.isPanning ? 'grabbing' : 'grab' }}
+              />
 
               {/* Clean, beginner-friendly legend - positioned top-left */}
               <g className="legend" transform="translate(20, 20)">
