@@ -1040,7 +1040,7 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Enhanced Controls Row 1 */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 bg-card/80 backdrop-blur supports-[backdrop-filter]:bg-card/40 p-2 rounded-md shadow-sm">
             <div className="flex gap-1">
               {/* View Mode Toggle */}
               <Button
@@ -1474,7 +1474,7 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
                       stroke={isVisible ? "rgba(74, 144, 226, 0.15)" : "rgba(229, 231, 235, 0.3)"}
                       strokeWidth="1"
                       strokeDasharray="15,10"
-                      className="transition-all duration-300"
+                      className=""
                     />
                     
                     {/* Floating layer label - top left corner */}
@@ -1562,7 +1562,7 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
                   const strokeWidth = isIncident ? 4 : (typeMatch && connectionFilter !== 'all' ? 4 : (isHighlighted ? 4 : baseStyle.strokeWidth))
 
                   return (
-                    <g key={connection.id} className="transition-all duration-300">
+                    <g key={connection.id} className="connection-group">
                       <path
                         d={path}
                         fill="none"
@@ -1571,7 +1571,7 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
                         strokeDasharray={baseStyle.strokeDasharray}
                         opacity={opacity}
                         markerEnd={marker}
-                        className="drop-shadow-sm hover:cursor-pointer transition-all duration-300"
+                        className="drop-shadow-sm hover:cursor-pointer"
                       />
 
                       {/* Flow animation only for incident edges */}
@@ -1633,7 +1633,7 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
                 return (
                   <g
                     key={component.id}
-                    className={`architecture-component transition-all duration-200 ${
+                    className={`architecture-component transition-transform duration-100 ${
                       isLayoutLocked ? 'cursor-pointer' : 'cursor-grab'
                     } ${isDragged ? 'dragging cursor-grabbing' : ''} ${hoveredComponent === component.id ? 'hovered' : ''}`}
                     onClick={() => handleComponentClick(component)}
@@ -1642,7 +1642,7 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
                     onMouseLeave={() => setHoveredComponent(null)}
                     style={{ 
                       opacity: isVisible ? 1 : 0.3,
-                      transform: isDragged ? 'scale(1.05)' : (hoveredComponent === component.id ? 'scale(1.02)' : 'scale(1)'),
+                      transform: isDragged ? 'scale(1.02)' : 'scale(1)',
                       transformOrigin: 'center'
                     }}
                   >
@@ -1657,7 +1657,7 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
                       strokeWidth={isSelected ? 4 : isDragged ? 3 : (hoveredComponent === component.id ? 3 : 2)}
                       rx="12"
                       filter={isSelected ? "url(#glow)" : "url(#dropshadow)"}
-                      className="transition-all duration-200 hover:brightness-110"
+                      className="hover:brightness-110"
                       style={{
                         filter: hoveredComponent === component.id ? 'drop-shadow(0 8px 16px rgba(0,0,0,0.15))' : undefined
                       }}
