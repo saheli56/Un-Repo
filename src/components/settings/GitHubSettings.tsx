@@ -10,6 +10,8 @@ interface GitHubSettingsProps {
   onClose?: () => void
 }
 
+// RepoPicker has moved to a dedicated Repos view in the header
+
 export function GitHubSettings({ onClose }: GitHubSettingsProps) {
   const [token, setToken] = useState('')
   const [isValidating, setIsValidating] = useState(false)
@@ -231,14 +233,6 @@ export function GitHubSettings({ onClose }: GitHubSettingsProps) {
               Tree View
             </Button>
             <Button
-              variant={activeInteractiveView === 'network' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => handleInteractiveViewChange('network')}
-              className={`cursor-pointer hover:scale-105 transition-transform duration-200 ${activeInteractiveView === 'network' ? 'border-b-2 border-primary' : ''}`}
-            >
-              Network View
-            </Button>
-            <Button
               variant={activeInteractiveView === 'architecture' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => handleInteractiveViewChange('architecture')}
@@ -257,6 +251,8 @@ export function GitHubSettings({ onClose }: GitHubSettingsProps) {
           )}
         </CardContent>
       </Card>
+
+  {/* Repo Picker removed from Settings; access via the Repos header section */}
 
       {/* Cache Management */}
       <CacheManagement />

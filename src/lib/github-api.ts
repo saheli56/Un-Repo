@@ -85,7 +85,7 @@ export class GitHubAPI {
 
       // Add authorization header if token is available
       if (this.token) {
-        headers['Authorization'] = `token ${this.token}`
+  headers['Authorization'] = `Bearer ${this.token}`
       }
       
       const response = await fetch(`${GITHUB_API_BASE}${endpoint}`, { headers })
@@ -171,6 +171,21 @@ export class GitHubAPI {
     repo: string
   ): Promise<GitHubAPIResponse<{ names: string[] }>> {
     return this.request<{ names: string[] }>(`/repos/${owner}/${repo}/topics`)
+  }
+
+  // Return authenticated user profile
+  static async getAuthenticatedUser(): Promise<GitHubAPIResponse<{ login: string; avatar_url: string; html_url: string }>> {
+    return this.request('/user')
+  }
+
+  // List repositories for the authenticated user
+  static async listUserRepos(options: { visibility?: 'all' | 'public' | 'private'; affiliation?: string; per_page?: number; page?: number } = {}): Promise<GitHubAPIResponse<GitHubRepo[]>> {
+    const params = new URLSearchParams()
+    if (options.visibility) params.set('visibility', options.visibility)
+    if (options.affiliation) params.set('affiliation', options.affiliation)
+    params.set('per_page', String(options.per_page ?? 50))
+    params.set('page', String(options.page ?? 1))
+    return this.request(`/user/repos?${params.toString()}`)
   }
 }
 

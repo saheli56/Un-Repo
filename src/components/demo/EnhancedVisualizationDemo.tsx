@@ -520,6 +520,7 @@ export function EnhancedVisualizationDemo() {
       {showDemo && (
         <ArchitectureVisualizer 
           architecture={demoArchitecture}
+          repo={{ owner: 'demo', name: 'demo', url: 'https://github.com/demo/demo' }}
           className="animate-in slide-in-from-top-4 duration-500"
         />
       )}

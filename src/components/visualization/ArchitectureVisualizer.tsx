@@ -1835,17 +1835,18 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
                   {isLoadingExplanation && <Loader2 className="h-4 w-4 animate-spin ml-2" />}
                 </h4>
                 
-                {!GeminiAnalyzer.hasApiKey() ? (
+                {!GeminiAnalyzer.hasApiKey() && (
                   <div className="text-purple-600 text-sm bg-purple-50 border border-purple-200 rounded p-2">
                     <FileText className="h-4 w-4 inline mr-2" />
                     Configure your Gemini API key in the API settings to get AI-powered file explanations.
                   </div>
-                ) : isLoadingExplanation ? (
+                )}
+                {GeminiAnalyzer.hasApiKey() && isLoadingExplanation && (
                   <div className="flex items-center gap-2 text-purple-600">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     <span>Analyzing file with Gemini AI...</span>
                   </div>
-                ) : null}
+                )}
                 
                 {explanationError && (
                   <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded p-2">
@@ -2043,7 +2044,7 @@ export function ArchitectureVisualizer({ architecture, repo, className = '' }: A
                         </div>
                         <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
                           <div className="flex justify-between mb-1">
-                            <span className="font-medium">� {call.file.split('/').pop()}</span>
+                            <span className="font-medium"><span className="mr-1">📄</span>{call.file.split('/').pop()}</span>
                             <span className="text-blue-600">Line {call.line}</span>
                           </div>
                           <div className="font-mono bg-white px-2 py-1 rounded text-xs border">

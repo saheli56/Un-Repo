@@ -9,19 +9,22 @@ import { CodeViewer } from '@/components/code/CodeViewer'
 import { AIPanel } from '@/components/ai/AIPanel'
 import { AdvancedSearch } from '@/components/search/AdvancedSearch'
 import { GitHubSettings } from '@/components/settings/GitHubSettings'
+import { RepoPicker } from '@/components/repo/RepoPicker'
 import { GeminiSettings } from '@/components/settings/GeminiSettings'
 import { GitHubRepo, FileNode, RepoAnalysis } from '@/types'
-import { Github, Code, TreePine, Key, ArrowLeft, ArrowRight } from 'lucide-react'
+import { Github, Code, TreePine, Key, ArrowLeft, ArrowRight, LogOut } from 'lucide-react'
 import { analyzeRepository } from '@/lib/utils'
+import { startGitHubLogin, consumeCallbackTokenFromUrl } from '@/lib/auth'
+import { GitHubAPI } from '@/lib/github-api'
 
 interface AppState {
   currentRepo: GitHubRepo | null
   repoAnalysis: RepoAnalysis | null
   selectedFile: FileNode | null
   isLoading: boolean
-  view: 'input' | 'explorer' | 'interactive' | 'settings'
+  view: 'input' | 'explorer' | 'interactive' | 'settings' | 'repos'
   darkMode: boolean
-  navigationHistory: Array<'input' | 'explorer' | 'interactive' | 'settings'>
+  navigationHistory: Array<'input' | 'explorer' | 'interactive' | 'settings' | 'repos'>
 }
 
 export default function App() {
@@ -30,14 +33,15 @@ export default function App() {
     repoAnalysis: null,
     selectedFile: null,
     isLoading: false,
-    view: 'input',
+  view: 'input',
     darkMode: true,
-    navigationHistory: ['input'],
+  navigationHistory: ['input'],
     forwardHistory: [],
   })
 
   // Simple auth state for demo
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => !!localStorage.getItem('github_api_token'))
+  const [user, setUser] = useState<{ login: string; avatar_url: string } | null>(null)
 
   useEffect(() => {
     // Apply dark mode class to html element
@@ -47,6 +51,25 @@ export default function App() {
       document.documentElement.classList.remove('dark')
     }
   }, [state.darkMode])
+
+  // Handle OAuth callback token in URL and fetch user
+  useEffect(() => {
+    const token = consumeCallbackTokenFromUrl()
+    if (token) {
+      GitHubAPI.setToken(token)
+      setIsLoggedIn(true)
+      ;(async () => {
+        const me = await GitHubAPI.getAuthenticatedUser()
+        if (!me.error) setUser({ login: me.data.login, avatar_url: me.data.avatar_url })
+      })()
+    } else if (isLoggedIn) {
+      // If already logged in (token in localStorage), load user
+      ;(async () => {
+        const me = await GitHubAPI.getAuthenticatedUser()
+        if (!me.error) setUser({ login: me.data.login, avatar_url: me.data.avatar_url })
+      })()
+    }
+  }, [isLoggedIn])
 
   const handleRepoSubmit = async (repo: GitHubRepo) => {
     setState(prev => ({ ...prev, isLoading: true, currentRepo: repo }))
@@ -95,9 +118,7 @@ export default function App() {
     }
   }
 
-  const toggleDarkMode = () => {
-    setState(prev => ({ ...prev, darkMode: !prev.darkMode }))
-  }
+  // Dark mode toggle functionality can be wired to a UI control later
 
   const navigateToView = (newView: AppState['view']) => {
     setState(prev => {
@@ -253,6 +274,19 @@ export default function App() {
               </div>
             )}
             
+            {/* Repositories and API Buttons */}
+            {isLoggedIn && (
+              <div className="flex items-center justify-center bg-card/50 px-4 py-2 rounded-lg shadow-md">
+                <Button
+                  variant={state.view === 'repos' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => navigateToView('repos')}
+                  className={`cursor-pointer hover:scale-110 transition-transform duration-200 ${state.view === 'repos' ? 'border-b-2 border-primary' : ''}`}
+                >
+                  Repos
+                </Button>
+              </div>
+            )}
             {/* API Settings Button */}
             <div className="flex items-center justify-center bg-card/50 px-4 py-2 rounded-lg shadow-md">
               <Button
@@ -269,33 +303,30 @@ export default function App() {
             {/* Login, Sign Up, and Profile Buttons */}
             <div className="flex items-center space-x-2">
               {!isLoggedIn ? (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => alert('Login functionality to be implemented')}
-                    className="cursor-pointer hover:scale-105 transition-transform duration-200"
-                  >
-                    Login
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => alert('Sign Up functionality to be implemented')}
-                    className="cursor-pointer hover:scale-105 transition-transform duration-200"
-                  >
-                    Sign Up
-                  </Button>
-                </>
-              ) : (
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => alert('Profile functionality to be implemented')}
+                  onClick={() => startGitHubLogin()}
                   className="cursor-pointer hover:scale-105 transition-transform duration-200"
                 >
-                  Profile
+                  Login with GitHub
                 </Button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  {user && <img src={user.avatar_url} alt="avatar" className="h-6 w-6 rounded-full" />}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      GitHubAPI.setToken(null)
+                      setIsLoggedIn(false)
+                      setUser(null)
+                    }}
+                    className="cursor-pointer hover:scale-105 transition-transform duration-200"
+                  >
+                    <LogOut className="h-4 w-4 mr-1"/> Logout
+                  </Button>
+                </div>
               )}
             </div>
           </div>
@@ -314,6 +345,29 @@ export default function App() {
               className="max-w-2xl mx-auto"
             >
               <RepoInput onSubmit={handleRepoSubmit} isLoading={state.isLoading} />
+              {isLoggedIn && (
+                <div className="text-center mt-4">
+                  <Button variant="ghost" size="sm" onClick={() => navigateToView('repos')}>
+                    Or choose from your GitHub repositories →
+                  </Button>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {state.view === 'repos' && (
+            <motion.div
+              key="repos"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="max-w-4xl mx-auto"
+            >
+              {isLoggedIn ? (
+                <RepoPicker onSelect={handleRepoSubmit} />
+              ) : (
+                <div className="text-center text-muted-foreground">Login with GitHub to access your repositories.</div>
+              )}
             </motion.div>
           )}
 
@@ -386,7 +440,7 @@ export default function App() {
             </motion.div>
           )}
 
-          {state.view === 'settings' && (
+      {state.view === 'settings' && (
             <motion.div
               key="settings"
               initial={{ opacity: 0 }}
@@ -394,7 +448,7 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="max-w-4xl mx-auto space-y-6"
             >
-              <GitHubSettings />
+        <GitHubSettings />
               <GeminiSettings />
             </motion.div>
           )}
