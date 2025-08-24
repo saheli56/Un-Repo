@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
   "dev": "vite",
-  "dev:server": "node --env-file=.env server/index.js",
+  "dev:server": "node server/index.js",
   "dev:all": "concurrently \"npm:dev\" \"npm:dev:server\"",
   "build": "tsc -b && vite build",
     "lint": "eslint .",
