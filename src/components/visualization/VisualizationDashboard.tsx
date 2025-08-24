@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { FileNode, GitHubRepo } from '@/types'
 import { InteractiveFileTree } from './InteractiveFileTree'
-import { ArchitectureVisualizer } from './ArchitectureVisualizer'
+import { FileVisualizer } from './FileVisualizer'
 import { enhancedAnalyzer, SystemArchitecture } from '@/lib/enhanced-analyzer'
 import { 
   TreePine, 
@@ -14,7 +14,8 @@ import {
   Layers,
   Globe,
   AlertCircle,
-  Loader2
+  Loader2,
+  Network
 } from 'lucide-react'
 
 interface VisualizationDashboardProps {
@@ -30,7 +31,7 @@ export function VisualizationDashboard({
   onFileSelect, 
   selectedFile 
 }: VisualizationDashboardProps) {
-  const [activeTab, setActiveTab] = useState('tree')
+  const [activeTab, setActiveTab] = useState('graph')
   const [architecture, setArchitecture] = useState<SystemArchitecture | null>(null)
   const [architectureLoading, setArchitectureLoading] = useState(false)
   const [architectureError, setArchitectureError] = useState<string | null>(null)
@@ -57,9 +58,9 @@ export function VisualizationDashboard({
     }
   }, [repo.owner, repo.name])
 
-  // Load architecture analysis when switching to architecture tab
+  // Load architecture analysis when switching to graph tab
   useEffect(() => {
-    if (activeTab === 'architecture' && !architecture && !architectureLoading) {
+    if (activeTab === 'graph' && !architecture && !architectureLoading) {
       loadArchitecture()
     }
   }, [activeTab, architecture, architectureLoading, loadArchitecture])
@@ -147,20 +148,19 @@ export function VisualizationDashboard({
                 <TreePine className="h-4 w-4" />
                 Tree View
               </Button>
-              {/* Network View removed */}
               <Button
-                variant={activeTab === 'architecture' ? 'default' : 'outline'}
+                variant={activeTab === 'graph' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setActiveTab('architecture')}
+                onClick={() => setActiveTab('graph')}
                 className="flex items-center gap-2"
                 disabled={architectureLoading}
               >
                 {architectureLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <Layers className="h-4 w-4" />
+                  <Network className="h-4 w-4" />
                 )}
-                Architecture
+                Graph View
               </Button>
             </div>
           </div>
@@ -196,16 +196,14 @@ export function VisualizationDashboard({
             />
           )}
 
-          {/* Network View removed */}
-
-          {activeTab === 'architecture' && (
+          {activeTab === 'graph' && (
             <div className="p-4">
               {architectureLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="text-center space-y-4">
                     <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
                     <div>
-                      <div className="font-medium">Analyzing Repository Architecture</div>
+                      <div className="font-medium">Analyzing Repository</div>
                       <div className="text-sm text-muted-foreground">
                         Fetching files, parsing code, and identifying patterns...
                       </div>
@@ -237,19 +235,19 @@ export function VisualizationDashboard({
                   {architecture.isFast && (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground px-2 py-1 bg-amber-50 border border-amber-200 rounded w-fit">
                       <span className="font-medium text-amber-700">Preview</span>
-                      <span>Fast architecture view loading full details…</span>
+                      <span>Fast analysis view loading full details…</span>
                     </div>
                   )}
-                  <ArchitectureVisualizer architecture={architecture} repo={repo} />
+                  <FileVisualizer architecture={architecture} repo={repo} />
                 </div>
               ) : (
                 <div className="flex items-center justify-center py-12">
                   <div className="text-center space-y-4">
-                    <Layers className="h-8 w-8 mx-auto text-muted-foreground" />
+                    <Network className="h-8 w-8 mx-auto text-muted-foreground" />
                     <div>
-                      <div className="font-medium">Architecture Analysis</div>
+                      <div className="font-medium">File Graph Analysis</div>
                       <div className="text-sm text-muted-foreground">
-                        Click to analyze the repository architecture and API calls
+                        Click to analyze the repository and build a file graph
                       </div>
                       <Button 
                         variant="default" 
@@ -257,7 +255,7 @@ export function VisualizationDashboard({
                         onClick={loadArchitecture}
                         className="mt-3"
                       >
-                        Analyze Architecture
+                        Analyze Repository
                       </Button>
                     </div>
                   </div>
@@ -279,11 +277,17 @@ export function VisualizationDashboard({
                 <div className="text-muted-foreground">Hierarchical file structure with expand/collapse functionality</div>
               </div>
             </div>
-            {/* Network View tip removed */}
+            <div className="flex items-start gap-3">
+              <Network className="h-5 w-5 text-indigo-500 mt-0.5" />
+              <div>
+                <div className="font-medium">Graph View</div>
+                <div className="text-muted-foreground">Interactive file and directory connection graph</div>
+              </div>
+            </div>
             <div className="flex items-start gap-3">
               <Layers className="h-5 w-5 text-purple-500 mt-0.5" />
               <div>
-                <div className="font-medium">Architecture View</div>
+                <div className="font-medium">Architecture Analysis</div>
                 <div className="text-muted-foreground">System architecture with API calls, build tools, and component relationships</div>
               </div>
             </div>

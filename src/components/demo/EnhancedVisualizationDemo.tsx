@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
-import { ArchitectureVisualizer } from '../visualization/ArchitectureVisualizer'
+import { FileVisualizer } from '../visualization/FileVisualizer'
 import { SystemArchitecture } from '@/lib/enhanced-analyzer'
 import { 
   Code, 
@@ -518,7 +518,7 @@ export function EnhancedVisualizationDemo() {
 
       {/* Demo Visualization */}
       {showDemo && (
-        <ArchitectureVisualizer 
+        <FileVisualizer 
           architecture={demoArchitecture}
           repo={{ owner: 'demo', name: 'demo', url: 'https://github.com/demo/demo' }}
           className="animate-in slide-in-from-top-4 duration-500"
