@@ -58,15 +58,15 @@ export function getLanguageFromExtension(extension: string): string {
   return languageMap[extension.toLowerCase()] || 'text'
 }
 
-export function debounce<T extends (...args: unknown[]) => unknown>(
+export function debounce<T extends (...args: never[]) => void>(
   func: T,
   wait: number
-): (...args: Parameters<T>) => void {
+): T {
   let timeout: ReturnType<typeof setTimeout>
-  return (...args: Parameters<T>) => {
+  return ((...args: Parameters<T>) => {
     clearTimeout(timeout)
     timeout = setTimeout(() => func(...args), wait)
-  }
+  }) as T
 }
 
 export function throttle<T extends (...args: unknown[]) => unknown>(

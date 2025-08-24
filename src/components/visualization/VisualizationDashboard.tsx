@@ -257,7 +257,7 @@ export function VisualizationDashboard({
                       <span>Fast architecture view loading full details…</span>
                     </div>
                   )}
-                  <ArchitectureVisualizer architecture={architecture} />
+                  <ArchitectureVisualizer architecture={architecture} repo={repo} />
                 </div>
               ) : (
                 <div className="flex items-center justify-center py-12">

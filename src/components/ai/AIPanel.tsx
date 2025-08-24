@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { GitHubRepo, FileNode, AIExplanation } from '@/types'
+import { GeminiAnalyzer } from '@/lib/gemini-analyzer'
+import { GitHubAPI } from '@/lib/github-api'
 import { 
   Brain, 
   Sparkles, 
@@ -22,161 +24,77 @@ interface AIPanelProps {
 export function AIPanel({ file, repo }: AIPanelProps) {
   const [explanation, setExplanation] = useState<AIExplanation | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-
-  // Mock AI explanations for demo
-  const mockExplanations: Record<string, AIExplanation> = {
-    'index.js': {
-      summary: 'Application entry point that initializes React and renders the main App component.',
-      details: 'This file is the root of your React application. It imports React and ReactDOM, then uses ReactDOM.createRoot() to create a root element and render the App component wrapped in React.StrictMode for better development experience.',
-      codeFlow: [
-        'Import React and ReactDOM libraries',
-        'Import CSS styles and App component',
-        'Create root element from DOM',
-        'Render App component with StrictMode'
-      ],
-      suggestions: [
-        'Consider adding error boundaries for better error handling',
-        'Add service worker registration for PWA capabilities',
-        'Consider lazy loading for performance optimization'
-      ],
-      relatedFiles: ['App.js', 'index.css'],
-      timestamp: Date.now()
-    },
-    'App.js': {
-      summary: 'Main application component that manages user state and renders the primary UI structure.',
-      details: 'This is the main component of your application. It uses React hooks (useState, useEffect) to manage user data, handles asynchronous data fetching, and renders the main layout including Header and Footer components.',
-      codeFlow: [
-        'Initialize state for user data and loading',
-        'Fetch user data on component mount',
-        'Handle loading and error states',
-        'Render Header, main content, and Footer'
-      ],
-      suggestions: [
-        'Add error handling for failed API calls',
-        'Consider using React Query for better data management',
-        'Add loading skeletons for better UX',
-        'Implement proper TypeScript types'
-      ],
-      relatedFiles: ['Header.js', 'Footer.js', 'client.js'],
-      timestamp: Date.now()
-    },
-    'Header.js': {
-      summary: 'Navigation header component with user authentication display.',
-      details: 'A reusable header component that displays the application logo, navigation menu, and user information when available. It receives user data as props and conditionally renders user-specific content.',
-      codeFlow: [
-        'Render application logo',
-        'Display navigation menu',
-        'Conditionally show user information',
-        'Apply responsive styling'
-      ],
-      suggestions: [
-        'Add mobile responsive navigation menu',
-        'Implement logout functionality',
-        'Add accessibility attributes (ARIA labels)',
-        'Consider using React Router for navigation'
-      ],
-      relatedFiles: ['App.js', 'Header.css'],
-      timestamp: Date.now()
-    },
-    'package.json': {
-      summary: 'Project configuration file defining dependencies, scripts, and metadata.',
-      details: 'This file contains all the essential configuration for your React project, including dependencies, build scripts, and project metadata. It defines React 18 as the main framework and includes common development tools.',
-      codeFlow: [
-        'Define project metadata and version',
-        'List production dependencies',
-        'Configure build and development scripts',
-        'Set up ESLint and browser support'
-      ],
-      suggestions: [
-        'Consider updating to latest React version',
-        'Add TypeScript for better type safety',
-        'Include testing utilities like Jest',
-        'Add pre-commit hooks with Husky'
-      ],
-      relatedFiles: ['package-lock.json', '.gitignore'],
-      timestamp: Date.now()
-    },
-    'README.md': {
-      summary: 'Project documentation with setup instructions and overview.',
-      details: 'Comprehensive documentation that explains the project structure, setup process, and key features. It provides clear instructions for new developers to get started with the codebase.',
-      codeFlow: [
-        'Introduce project purpose and features',
-        'Provide installation instructions',
-        'Explain project structure',
-        'Include contribution guidelines'
-      ],
-      suggestions: [
-        'Add screenshots or demos',
-        'Include API documentation',
-        'Add troubleshooting section',
-        'Consider adding badges for build status'
-      ],
-      relatedFiles: ['package.json', '.gitignore'],
-      timestamp: Date.now()
-    }
-  }
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   useEffect(() => {
-    if (file) {
-      setIsLoading(true)
-      // Simulate AI processing delay
-      const timer = setTimeout(() => {
-        const mockExplanation = mockExplanations[file.name] || {
-          summary: `Analysis for ${file.name}`,
-          details: 'This file contains code that would be analyzed by AI to provide insights about its purpose, structure, and relationships.',
-          codeFlow: ['Loading analysis...'],
-          suggestions: ['Analysis in progress...'],
-          relatedFiles: [],
-          timestamp: Date.now()
-        }
-        setExplanation(mockExplanation)
-        setIsLoading(false)
-      }, 1500)
-
-      return () => clearTimeout(timer)
-    }
-  }, [file])
-
-  const refreshAnalysis = async () => {
-    if (file) {
+    const run = async () => {
+      if (!file) return
       setIsLoading(true)
       setExplanation(null)
-      
+
       try {
-        // Simulate API delay for refreshing analysis
-        await new Promise(resolve => setTimeout(resolve, 1500))
-        
-        // Get fresh analysis (in real implementation, this would call AI service)
-        const freshAnalysis = mockExplanations[file.name]
-        if (freshAnalysis) {
-          // Create a refreshed version with new timestamp and potentially updated content
-          const refreshedAnalysis = {
-            ...freshAnalysis,
-            timestamp: Date.now(),
-            summary: `${freshAnalysis.summary} (Updated)`,
-            suggestions: [
-              ...(freshAnalysis.suggestions || []),
-              `Refreshed analysis at ${new Date().toLocaleTimeString()}`
-            ]
+        if (GeminiAnalyzer.hasApiKey()) {
+          const config = GeminiAnalyzer.getConfig()
+          if (!config) throw new Error('Gemini API key not configured')
+
+          const resp = await GitHubAPI.getFileContent(repo.owner, repo.name, file.path)
+          if (resp.error || !resp.data) {
+            throw new Error(resp.error || 'Failed to load file content')
           }
-          setExplanation(refreshedAnalysis)
+          const content = resp.data.content || ''
+
+          const fx = await GeminiAnalyzer.explainFile(
+            config,
+            file.path,
+            content,
+            {
+              name: repo.name,
+              techStack: repo.language ? [repo.language] : ['JavaScript', 'TypeScript'],
+              description: repo.description
+            }
+          )
+
+          const mapped: AIExplanation = {
+            summary: fx.purpose,
+            details: fx.whatItDoes + (fx.technicalDetails ? ` ${fx.technicalDetails}` : ''),
+            codeFlow: fx.keyFeatures,
+            suggestions: fx.beginnerTips,
+            relatedFiles: fx.relatedFiles,
+            timestamp: Date.now()
+          }
+
+          setExplanation(mapped)
         } else {
-          // If no mock data exists, create a generic analysis
           setExplanation({
-            summary: `Analysis for ${file.name} has been refreshed.`,
-            details: `This file analysis was refreshed at ${new Date().toLocaleString()}. In a real implementation, this would call an AI service to provide fresh insights.`,
-            codeFlow: ['File loaded', 'Analysis refreshed', 'Results updated'],
-            suggestions: ['Analysis has been refreshed successfully'],
+            summary: `AI key not configured`,
+            details: 'Add your Gemini API key in Settings to enable AI analysis for files.',
+            codeFlow: [],
+            suggestions: ['Open Settings > Gemini and paste your API key', 'Then click Refresh'],
             relatedFiles: [],
             timestamp: Date.now()
           })
         }
       } catch (error) {
-        console.error('Error refreshing analysis:', error)
-        // Keep previous explanation if refresh fails
+        console.error('Error getting AI explanation:', error)
+        setExplanation({
+          summary: `Analysis unavailable`,
+          details: error instanceof Error ? error.message : 'Unknown error occurred',
+          codeFlow: [],
+          suggestions: ['Try again later', 'Verify your network and API key'],
+          relatedFiles: [],
+          timestamp: Date.now()
+        })
       } finally {
         setIsLoading(false)
       }
+    }
+
+    run()
+  }, [file, repo, refreshTrigger])
+
+  const refreshAnalysis = async () => {
+    if (file) {
+      setRefreshTrigger(prev => prev + 1)
     }
   }
 

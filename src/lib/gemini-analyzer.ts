@@ -98,8 +98,41 @@ export interface GeminiAnalysisResponse {
   }
 }
 
+export interface FileExplanation {
+  fileName: string
+  purpose: string
+  whatItDoes: string
+  keyFeatures: string[]
+  importance: 'critical' | 'important' | 'supporting' | 'optional'
+  relatedFiles: string[]
+  beginnerTips: string[]
+  technicalDetails?: string
+}
+
 export class GeminiAnalyzer {
   private static config: GeminiConfig | null = null
+
+  /**
+   * Check if Gemini API key is available
+   */
+  static hasApiKey(): boolean {
+    const key = localStorage.getItem('gemini_api_key')
+    return !!(key && key.trim().length > 0)
+  }
+
+  /**
+   * Get Gemini configuration from localStorage
+   */
+  static getConfig(): GeminiConfig | null {
+    const apiKey = localStorage.getItem('gemini_api_key')
+    if (!apiKey || !apiKey.trim()) {
+      return null
+    }
+    return {
+      apiKey: apiKey.trim(),
+      model: 'gemini-1.5-flash-latest'
+    }
+  }
 
   static configure(config: GeminiConfig) {
     this.config = config
@@ -107,10 +140,6 @@ export class GeminiAnalyzer {
 
   static isConfigured(): boolean {
     return this.config !== null && this.config.apiKey.length > 0
-  }
-
-  static getConfig(): GeminiConfig | null {
-    return this.config
   }
 
   /**
@@ -363,6 +392,227 @@ Respond with ONLY the JSON object, no additional text or explanation.`
         })),
         connections: []
       }
+    }
+  }
+
+  /**
+   * Get AI-powered explanation for a specific file
+   */
+  static async explainFile(
+    config: GeminiConfig,
+    fileName: string,
+    fileContent: string,
+    repositoryContext?: {
+      name: string
+      techStack: string[]
+      description?: string
+    }
+  ): Promise<FileExplanation> {
+    try {
+      const prompt = this.buildFileExplanationPrompt(fileName, fileContent, repositoryContext)
+      
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${config.model || 'gemini-1.5-flash-latest'}:generateContent?key=${config.apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{ text: prompt }]
+          }],
+          generationConfig: {
+            temperature: 0.3,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 1024,
+          }
+        })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`Gemini API Error: ${response.status} - ${errorText}`)
+      }
+
+      const data = await response.json()
+      
+      if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+        throw new Error('Invalid response from Gemini API')
+      }
+
+      const explanationText: string = (data.candidates[0].content.parts as Array<{ text?: string }>)
+        .map((p) => p.text ?? '')
+        .join('\n')
+
+      // Try robust JSON extraction first
+      const extracted = this.tryExtractJson(explanationText)
+      if (extracted) return extracted
+
+      // If JSON parsing fails, create a heuristic, content-aware explanation
+      console.warn('Gemini response was not valid JSON; using heuristic explanation')
+      return this.createHeuristicExplanation(fileName, fileContent)
+      
+    } catch (error) {
+      console.error('File explanation failed:', error)
+      return this.createHeuristicExplanation(fileName, fileContent)
+    }
+  }
+
+  /**
+   * Attempt to extract and parse JSON from text that may include code fences or extra text
+   */
+  private static tryExtractJson(text: string): FileExplanation | null {
+    try {
+      let t = text.trim()
+      // Strip code fences if present
+      if (t.startsWith('```')) {
+        t = t.replace(/^```json\s*/i, '').replace(/^```\s*/i, '')
+        const lastFence = t.lastIndexOf('```')
+        if (lastFence !== -1) t = t.slice(0, lastFence)
+      }
+      // Extract JSON object between first { and last }
+      const first = t.indexOf('{')
+      const last = t.lastIndexOf('}')
+      if (first !== -1 && last !== -1 && last > first) {
+        const jsonSlice = t.slice(first, last + 1)
+        const obj = JSON.parse(jsonSlice) as FileExplanation
+        // Basic shape validation
+        if (obj && obj.fileName && obj.purpose && obj.whatItDoes) return obj
+      }
+  } catch {
+      // ignore
+    }
+    return null
+  }
+
+  /**
+   * Build file explanation prompt for Gemini
+   */
+  private static buildFileExplanationPrompt(
+    fileName: string,
+    fileContent: string,
+    repositoryContext?: {
+      name: string
+      techStack: string[]
+      description?: string
+    }
+  ): string {
+    const contextInfo = repositoryContext 
+      ? `This file is part of "${repositoryContext.name}", a ${repositoryContext.techStack.join(' and ')} project${repositoryContext.description ? `: ${repositoryContext.description}` : ''}.`
+      : ''
+
+    return `You are an expert software developer explaining code to developers who want to understand this file quickly.
+
+${contextInfo}
+
+Analyze this file and provide a JSON response with the following structure:
+
+{
+  "fileName": "${fileName}",
+  "purpose": "Brief one-sentence description of what this file does",
+  "whatItDoes": "Clear 2-3 sentence explanation of the file's main functionality",
+  "keyFeatures": ["Feature 1", "Feature 2", "Feature 3"],
+  "importance": "critical|important|supporting|optional",
+  "relatedFiles": ["file1.tsx", "file2.ts"],
+  "beginnerTips": ["Tip 1 for understanding", "Tip 2 for learning"],
+  "technicalDetails": "Optional: Advanced technical details for experienced developers"
+}
+
+FILE: ${fileName}
+CONTENT:
+${fileContent.slice(0, 3000)}${fileContent.length > 3000 ? '...[truncated]' : ''}
+
+Focus on:
+1. What this file actually does in simple terms
+2. Why it's important to the project
+3. How it fits into the overall architecture
+4. Key concepts a developer should understand
+5. Practical tips for working with this code
+
+Respond only with valid JSON, no additional text.`
+  }
+
+  /**
+   * Create fallback explanation when AI analysis fails
+   */
+  // Removed unused generic fallback in favor of heuristic explanation
+
+  /**
+   * Heuristic explanation using simple static analysis on the file content for more specific output
+   */
+  private static createHeuristicExplanation(fileName: string, fileContent: string): FileExplanation {
+    const name = fileName.split('/').pop() || fileName
+  // Basic React/TSX heuristics
+    const isReact = /from\s+['"]react['"]/i.test(fileContent)
+    const componentNameMatch = fileContent.match(/export\s+default\s+function\s+(\w+)/)
+      || fileContent.match(/function\s+(\w+)\s*\(/)
+      || fileContent.match(/const\s+(\w+)\s*=\s*\(/)
+    const componentName = componentNameMatch?.[1] || name.replace(/\.[tj]sx?$/, '')
+
+    const usesState = /useState\s*\(/.test(fileContent)
+    const usesEffect = /useEffect\s*\(/.test(fileContent)
+    const usesMemo = /useMemo\s*\(/.test(fileContent)
+    const usesCallback = /useCallback\s*\(/.test(fileContent)
+    const usesContext = /useContext\s*\(/.test(fileContent)
+    const usesRouter = /from\s+['"]react-router-dom['"]/.test(fileContent)
+    const hasFetch = /fetch\s*\(|axios\s*\./.test(fileContent)
+    const hasForm = /<form\b|useForm\s*\(/i.test(fileContent)
+    const rendersList = /\.map\s*\(/.test(fileContent)
+    const hasProps = /\(\s*props\s*[:)]|{\s*\w+\s*}\s*:\s*\w+\s*\)/.test(fileContent) || /export\s+interface\s+\w+Props/.test(fileContent)
+
+    const purposeParts: string[] = []
+    if (isReact) purposeParts.push('React component')
+    if (usesRouter) purposeParts.push('with routing')
+    if (hasForm) purposeParts.push('with form handling')
+    if (hasFetch) purposeParts.push('that interacts with APIs')
+    if (rendersList) purposeParts.push('that renders dynamic lists')
+    const purpose = purposeParts.length > 0
+      ? `${componentName} is a ${purposeParts.join(' ')}.`
+      : `${componentName} provides UI logic and rendering.`
+
+    const what: string[] = []
+    if (usesState) what.push('manages local state')
+    if (usesEffect) what.push('performs side effects')
+    if (usesMemo) what.push('memoizes derived values')
+    if (usesCallback) what.push('memoizes event handlers')
+    if (usesContext) what.push('consumes React context')
+    if (hasProps) what.push('receives props to control behavior')
+    if (hasFetch) what.push('fetches data from external services')
+    if (rendersList) what.push('renders collections using map()')
+    if (hasForm) what.push('handles user input via forms')
+
+    const whatItDoes = what.length > 0
+      ? `${componentName} ${what.join(', ')}.`
+      : `${componentName} renders UI elements and encapsulates presentation logic.`
+
+    const keyFeatures: string[] = []
+    if (usesState) keyFeatures.push('Local state via useState')
+    if (usesEffect) keyFeatures.push('Lifecycle logic via useEffect')
+    if (usesMemo) keyFeatures.push('Performance optimizations via useMemo')
+    if (usesCallback) keyFeatures.push('Stable callbacks via useCallback')
+    if (usesContext) keyFeatures.push('Shared state via useContext')
+    if (hasFetch) keyFeatures.push('Data fetching')
+    if (hasForm) keyFeatures.push('Form handling and validation')
+    if (rendersList) keyFeatures.push('List rendering from arrays')
+
+    const importance: 'critical' | 'important' | 'supporting' | 'optional' = isReact ? 'important' : 'supporting'
+
+    const beginnerTips = [
+      'Trace the component props to see how data flows in',
+      usesState ? 'Check initial state and how it updates with setState' : 'Identify whether the component is stateful or purely presentational',
+      usesEffect ? 'Look at useEffect dependencies to understand side effects timing' : 'Consider whether side effects are required',
+      rendersList ? 'Find where the list data comes from and the key props used' : 'Add PropTypes/TS interfaces to clarify props',
+    ]
+
+    return {
+      fileName,
+      purpose,
+      whatItDoes,
+      keyFeatures,
+      importance,
+      relatedFiles: [],
+      beginnerTips,
+      technicalDetails: `File type: ${fileName.split('.').pop()?.toUpperCase()} | Length: ${fileContent.length} chars`
     }
   }
 }

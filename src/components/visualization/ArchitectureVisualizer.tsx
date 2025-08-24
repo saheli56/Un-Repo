@@ -15,9 +15,15 @@ import {
   Lock,
   Unlock,
   LayoutGrid,
-  Shuffle
+  Shuffle,
+  Sparkles,
+  FileText,
+  Loader2
 } from 'lucide-react'
 import { SystemArchitecture, ArchitectureComponent, ArchitectureConnection } from '@/lib/enhanced-analyzer'
+import { GeminiAnalyzer, FileExplanation } from '@/lib/gemini-analyzer'
+import { GitHubAPI } from '@/lib/github-api'
+import { GitHubRepo } from '@/types'
 
 interface Position {
   x: number
@@ -31,6 +37,7 @@ interface DraggableComponent extends ArchitectureComponent {
 
 interface ArchitectureVisualizerProps {
   architecture: SystemArchitecture
+  repo: GitHubRepo
   className?: string
 }
 
@@ -83,52 +90,92 @@ class ForceSimulation {
     const nodeHeight = 75
     const verticalSpacing = 120
     const horizontalSpacing = 60
+    const leftMargin = 200 // Increased left margin to ensure nodes stay well within bounds
+
+    // Helper function to calculate safe row positioning
+    const calculateRowPositions = (rowNodes: DraggableComponent[], rowWidth: number) => {
+      const totalRowWidth = rowNodes.length * (nodeWidth + horizontalSpacing) - horizontalSpacing
+      const availableWidth = rowWidth - 2 * leftMargin
+      
+      // If nodes would overflow, use multiple rows
+      if (totalRowWidth > availableWidth) {
+        const nodesPerRow = Math.floor(availableWidth / (nodeWidth + horizontalSpacing))
+        return rowNodes.map((_, i) => {
+          const rowIndex = Math.floor(i / nodesPerRow)
+          const colIndex = i % nodesPerRow
+          const rowNodeCount = Math.min(nodesPerRow, rowNodes.length - rowIndex * nodesPerRow)
+          const rowStartX = leftMargin + (availableWidth - (rowNodeCount * (nodeWidth + horizontalSpacing) - horizontalSpacing)) / 2
+          
+          return {
+            x: rowStartX + colIndex * (nodeWidth + horizontalSpacing),
+            yOffset: rowIndex * (nodeHeight + 20) // Add small vertical offset for additional rows
+          }
+        })
+      } else {
+        // Center the row normally
+        const startX = Math.max(leftMargin, (rowWidth - totalRowWidth) / 2)
+        return rowNodes.map((_, i) => ({
+          x: startX + i * (nodeWidth + horizontalSpacing),
+          yOffset: 0
+        }))
+      }
+    }
 
     // 1. Entry points (top row)
+    const entryPositions = calculateRowPositions(entryNodes, width)
     entryNodes.forEach((node, i) => {
+      const pos = entryPositions[i]
       node.position = {
-        x: width / 2 - (entryNodes.length * (nodeWidth + horizontalSpacing)) / 2 + i * (nodeWidth + horizontalSpacing),
-        y: 60
+        x: pos.x,
+        y: 60 + pos.yOffset
       }
       node.size = { width: nodeWidth, height: nodeHeight }
     })
 
     // 2. Main components (second row)
     const mainComponents = nodes.filter(n => n.type === 'component' && !entryNodes.includes(n))
+    const mainPositions = calculateRowPositions(mainComponents, width)
     mainComponents.forEach((node, i) => {
+      const pos = mainPositions[i]
       node.position = {
-        x: width / 2 - (mainComponents.length * (nodeWidth + horizontalSpacing)) / 2 + i * (nodeWidth + horizontalSpacing),
-        y: 60 + verticalSpacing
+        x: pos.x,
+        y: 60 + verticalSpacing + pos.yOffset
       }
       node.size = { width: nodeWidth, height: nodeHeight }
     })
 
     // 3. Services/utilities (third row)
   const serviceNodes = nodes.filter(n => n.type === 'service')
+    const servicePositions = calculateRowPositions(serviceNodes, width)
     serviceNodes.forEach((node, i) => {
+      const pos = servicePositions[i]
       node.position = {
-        x: width / 2 - (serviceNodes.length * (nodeWidth + horizontalSpacing)) / 2 + i * (nodeWidth + horizontalSpacing),
-        y: 60 + 2 * verticalSpacing
+        x: pos.x,
+        y: 60 + 2 * verticalSpacing + pos.yOffset
       }
       node.size = { width: nodeWidth, height: nodeHeight }
     })
 
     // 4. Static assets/configs (fourth row)
     const assetNodes = nodes.filter(n => n.type === 'asset' || n.type === 'config')
+    const assetPositions = calculateRowPositions(assetNodes, width)
     assetNodes.forEach((node, i) => {
+      const pos = assetPositions[i]
       node.position = {
-        x: width / 2 - (assetNodes.length * (nodeWidth + horizontalSpacing)) / 2 + i * (nodeWidth + horizontalSpacing),
-        y: 60 + 3 * verticalSpacing
+        x: pos.x,
+        y: 60 + 3 * verticalSpacing + pos.yOffset
       }
       node.size = { width: nodeWidth, height: nodeHeight }
     })
 
     // 5. External services (bottom row)
     const externalNodes = nodes.filter(n => n.layer === 'external')
+    const externalPositions = calculateRowPositions(externalNodes, width)
     externalNodes.forEach((node, i) => {
+      const pos = externalPositions[i]
       node.position = {
-        x: width / 2 - (externalNodes.length * (nodeWidth + horizontalSpacing)) / 2 + i * (nodeWidth + horizontalSpacing),
-        y: 60 + 4 * verticalSpacing
+        x: pos.x,
+        y: 60 + 4 * verticalSpacing + pos.yOffset
       }
       node.size = { width: nodeWidth, height: nodeHeight }
     })
@@ -136,10 +183,12 @@ class ForceSimulation {
     // 6. Any remaining nodes (source, type, etc.)
     const placed = new Set([...entryNodes, ...mainComponents, ...serviceNodes, ...assetNodes, ...externalNodes])
     const remaining = nodes.filter(n => !placed.has(n))
+    const remainingPositions = calculateRowPositions(remaining, width)
     remaining.forEach((node, i) => {
+      const pos = remainingPositions[i]
       node.position = {
-        x: width / 2 - (remaining.length * (nodeWidth + horizontalSpacing)) / 2 + i * (nodeWidth + horizontalSpacing),
-        y: 60 + 5 * verticalSpacing
+        x: pos.x,
+        y: 60 + 5 * verticalSpacing + pos.yOffset
       }
       node.size = { width: nodeWidth, height: nodeHeight }
     })
@@ -164,18 +213,18 @@ class ForceSimulation {
   }
 
   private keepInBounds(node: DraggableComponent) {
-    const margin = 30
+    const margin = 150  // Large margin to ensure nodes stay well within visible bounds
     node.position.x = Math.max(margin, Math.min(this.width - node.size.width - margin, node.position.x))
     node.position.y = Math.max(100, Math.min(this.height - node.size.height - margin, node.position.y))
   }
 }
 
-export function ArchitectureVisualizer({ architecture, className = '' }: ArchitectureVisualizerProps) {
+export function ArchitectureVisualizer({ architecture, repo, className = '' }: ArchitectureVisualizerProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const lastMouseMoveRef = useRef<number>(0)
   const [scale, setScale] = useState(0.8)
-  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [pan, setPan] = useState({ x: -100, y: -50 }) // Shift content right and slightly down
   const [selectedComponent, setSelectedComponent] = useState<ArchitectureComponent | null>(null)
   const [visibleLayers, setVisibleLayers] = useState<Set<string>>(
     new Set(architecture.layers.map(layer => layer.id))
@@ -200,6 +249,10 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
   const [connectionFilter, setConnectionFilter] = useState<'all' | 'imports' | 'api' | 'config' | 'build'>('all')
   const [hoveredComponent, setHoveredComponent] = useState<string | null>(null)
   const [showConnectionLabels, setShowConnectionLabels] = useState(true)
+  // File explanation state for Gemini AI integration
+  const [fileExplanation, setFileExplanation] = useState<FileExplanation | null>(null)
+  const [isLoadingExplanation, setIsLoadingExplanation] = useState(false)
+  const [explanationError, setExplanationError] = useState<string | null>(null)
   // Route layout mode (hierarchical router -> pages) per new requirement
   const routeLayout = true
   const [syntheticConnections, setSyntheticConnections] = useState<ArchitectureConnection[]>([])
@@ -482,9 +535,9 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
         const layerStartY = 50 + (layerIndex * layerHeight)
         
         // Horizontal distribution within layer with generous spacing
-        const nodeWidth = Math.min((screenWidth - 100) / nodesPerRow, 250)
+        const nodeWidth = Math.min((screenWidth - 300) / nodesPerRow, 250) // Increased margin space
         const nodeSpacing = nodeWidth + 80 // Much more spacing between nodes
-        const layerStartX = 50 + Math.max(0, (screenWidth - 100 - (nodesPerRow * nodeSpacing)) / 2)
+        const layerStartX = 200 + Math.max(0, (screenWidth - 400 - (nodesPerRow * nodeSpacing)) / 2) // Much larger left margin
         
         const x = layerStartX + col * nodeSpacing
         const y = layerStartY + row * 110 // More vertical spacing too
@@ -492,8 +545,8 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
         return {
           ...comp,
           position: { 
-            x: Math.max(30, Math.min(x, screenWidth - comp.size.width - 30)), 
-            y: Math.max(30, Math.min(y, screenHeight - comp.size.height - 30))
+            x: Math.max(150, Math.min(x, screenWidth - comp.size.width - 150)), // Larger safe margins
+            y: Math.max(80, Math.min(y, screenHeight - comp.size.height - 80))
           },
           isDragging: false
         }
@@ -529,7 +582,7 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
   // Handle reset view
   const handleReset = () => {
     setScale(0.8)
-    setPan({ x: 0, y: 0 })
+    setPan({ x: -100, y: -50 }) // Use the same centered position as initial state
     setSelectedComponent(null)
     setHighlightedConnections(new Set())
   }
@@ -538,7 +591,7 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
   const applyAutoLayout = useCallback(() => {
     if (isLayoutLocked) return
     
-    const simulation = new ForceSimulation(components, architecture.connections, 1400, 800)
+    const simulation = new ForceSimulation(components, architecture.connections, 1600, 950) // Match viewBox dimensions
     const optimizedComponents = simulation.applyForces(100)
     setComponents(optimizedComponents)
   }, [components, architecture.connections, isLayoutLocked])
@@ -550,12 +603,62 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
     const shuffledComponents = components.map(comp => ({
       ...comp,
       position: {
-        x: 100 + Math.random() * 1200,
+        x: 200 + Math.random() * 1000, // Ensure nodes start well within bounds
         y: 100 + Math.random() * 600
       }
     }))
     setComponents(shuffledComponents)
   }, [components, isLayoutLocked])
+
+  // Function to fetch file explanation using Gemini API
+  const fetchFileExplanation = async (component: ArchitectureComponent) => {
+    const config = GeminiAnalyzer.getConfig()
+    if (!config || !repo) {
+      setExplanationError('Gemini API key not configured or repository info missing')
+      return
+    }
+
+    if (component.files.length === 0) {
+      setExplanationError('No files associated with this component')
+      return
+    }
+
+    setIsLoadingExplanation(true)
+    setExplanationError(null)
+
+    try {
+      // Get the first file from the component
+      const filePath = component.files[0]
+      
+      // Fetch file content from GitHub API
+      const fileResponse = await GitHubAPI.getFileContent(repo.owner, repo.name, filePath)
+      if (fileResponse.error || !fileResponse.data) {
+        throw new Error(`Failed to fetch file content: ${fileResponse.error}`)
+      }
+
+  // Content is already decoded by GitHubAPI.getFileContent
+  const fileContent = fileResponse.data.content || ''
+
+      // Get AI explanation
+      const explanation = await GeminiAnalyzer.explainFile(
+        config,
+        filePath,
+        fileContent,
+        {
+          name: repo.name,
+          techStack: repo.language ? [repo.language] : ['JavaScript', 'TypeScript'],
+          description: repo.description
+        }
+      )
+
+      setFileExplanation(explanation)
+    } catch (error) {
+      console.error('Failed to get file explanation:', error)
+      setExplanationError(error instanceof Error ? error.message : 'Failed to get explanation')
+    } finally {
+      setIsLoadingExplanation(false)
+    }
+  }
 
   // Handle component click
   const handleComponentClick = (component: ArchitectureComponent) => {
@@ -568,6 +671,14 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
       conn => conn.source === component.id || conn.target === component.id
     )
     setHighlightedConnections(new Set(relatedConnections.map(conn => conn.id)))
+
+    // Fetch AI explanation if Gemini API is available
+    if (GeminiAnalyzer.hasApiKey() && repo) {
+      fetchFileExplanation(component)
+    } else {
+      setFileExplanation(null)
+      setExplanationError(null)
+    }
   }
 
   // Mouse event handlers for dragging with smooth animation
@@ -1715,6 +1826,98 @@ export function ArchitectureVisualizer({ architecture, className = '' }: Archite
                 {getEducationalExplanation(selectedComponent)}
               </p>
             </div>
+
+            {/* AI-Powered File Explanation Section */}
+            <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-4">
+                <h4 className="font-semibold mb-3 text-purple-800 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  AI Analysis
+                  {isLoadingExplanation && <Loader2 className="h-4 w-4 animate-spin ml-2" />}
+                </h4>
+                
+                {!GeminiAnalyzer.hasApiKey() ? (
+                  <div className="text-purple-600 text-sm bg-purple-50 border border-purple-200 rounded p-2">
+                    <FileText className="h-4 w-4 inline mr-2" />
+                    Configure your Gemini API key in the API settings to get AI-powered file explanations.
+                  </div>
+                ) : isLoadingExplanation ? (
+                  <div className="flex items-center gap-2 text-purple-600">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Analyzing file with Gemini AI...</span>
+                  </div>
+                ) : null}
+                
+                {explanationError && (
+                  <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded p-2">
+                    <span className="font-medium">Error:</span> {explanationError}
+                  </div>
+                )}
+                
+                {GeminiAnalyzer.hasApiKey() && fileExplanation && !isLoadingExplanation && (
+                  <div className="space-y-4">
+                    <div>
+                      <h5 className="font-medium text-purple-700 mb-2">Purpose</h5>
+                      <p className="text-purple-600 text-sm">{fileExplanation.purpose}</p>
+                    </div>
+                    
+                    <div>
+                      <h5 className="font-medium text-purple-700 mb-2">What it does</h5>
+                      <p className="text-purple-600 text-sm">{fileExplanation.whatItDoes}</p>
+                    </div>
+                    
+                    {fileExplanation.keyFeatures.length > 0 && (
+                      <div>
+                        <h5 className="font-medium text-purple-700 mb-2">Key Features</h5>
+                        <ul className="text-purple-600 text-sm space-y-1">
+                          {fileExplanation.keyFeatures.map((feature, idx) => (
+                            <li key={idx} className="flex items-start gap-2">
+                              <span className="text-purple-400 mt-1">•</span>
+                              <span>{feature}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center gap-2">
+                      <Badge 
+                        variant={
+                          fileExplanation.importance === 'critical' ? 'destructive' :
+                          fileExplanation.importance === 'important' ? 'default' :
+                          'secondary'
+                        }
+                      >
+                        {fileExplanation.importance}
+                      </Badge>
+                      <span className="text-xs text-purple-500">
+                        Importance level
+                      </span>
+                    </div>
+                    
+                    {fileExplanation.beginnerTips.length > 0 && (
+                      <div>
+                        <h5 className="font-medium text-purple-700 mb-2">💡 Learning Tips</h5>
+                        <ul className="text-purple-600 text-sm space-y-1">
+                          {fileExplanation.beginnerTips.map((tip, idx) => (
+                            <li key={idx} className="flex items-start gap-2">
+                              <span className="text-purple-400 mt-1">→</span>
+                              <span>{tip}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    {fileExplanation.technicalDetails && (
+                      <div className="bg-purple-25 border border-purple-100 rounded p-2">
+                        <h5 className="font-medium text-purple-700 mb-1 text-xs">Technical Details</h5>
+                        <p className="text-purple-600 text-xs">{fileExplanation.technicalDetails}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+              </div>
 
             {/* Architectural Role Section */}
             <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
